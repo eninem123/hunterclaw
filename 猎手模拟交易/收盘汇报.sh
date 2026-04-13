@@ -1,6 +1,6 @@
 #!/bin/bash
-# 猎手模拟交易 - 每日多时报 + 收盘触发Hermes策略优化
-# 每个交易日 09:30 / 11:30 / 15:05 / 21:00 自动运行
+# 猎手模拟交易 - 每日多时报
+# 每个交易日 09:30 / 11:30 / 13:00 / 14:00 / 14:30 / 14:55 / 15:05 / 21:00
 
 WORKSPACE="/root/.openclaw/workspace"
 HUNTER_DIR="$WORKSPACE/猎手模拟交易"
@@ -8,17 +8,23 @@ REPORT_FILE="$HUNTER_DIR/持仓报告.md"
 SCRIPT="$HUNTER_DIR/持仓报告_心跳.py"
 LOG="$HUNTER_DIR/logs/cron-report.log"
 PENDING_DIR="$WORKSPACE/pending-summaries"
+MINUTE=$(date +%M)
 
-# 根据时段确定标题
-HOUR=$(date +%H)
-if [ "$HOUR" = "09" ]; then
+# 根据时间确定时段标题
+if [ "$1" = "09" ]; then
     SLOT="开盘报"
-elif [ "$HOUR" = "11" ]; then
+elif [ "$1" = "11" ]; then
     SLOT="午盘报"
-elif [ "$HOUR" = "15" ]; then
+elif [ "$1" = "13" ]; then
+    SLOT="下午开盘报"
+elif [ "$1" = "14" ] && [ "$MINUTE" = "00" ]; then
+    SLOT="下午2点报"
+elif [ "$1" = "14" ] && [ "$MINUTE" = "30" ]; then
+    SLOT="下午2点半报"
+elif [ "$1" = "14" ] && [ "$MINUTE" = "55" ]; then
+    SLOT="收盘前撤退检查"
+elif [ "$1" = "15" ]; then
     SLOT="收盘报"
-    # 收盘时同步触发 Hermes 策略优化
-    TRIGGER_HERMES=1
 else
     SLOT="持仓报"
 fi
@@ -30,19 +36,12 @@ mkdir -p "$HUNTER_DIR/logs"
 
 echo "=== $SLOT $(date '+%Y-%m-%d %H:%M:%S') ===" >> $LOG
 
-# 生成持仓报告
 cd $HUNTER_DIR
 timeout 25 python3 "$SCRIPT" "$SLOT" >> $LOG 2>&1
 
 if [ $? -eq 0 ] && [ -f "$REPORT_FILE" ]; then
     cp "$REPORT_FILE" "$PENDING_FILE"
-    echo "$SLOT 已生成并加入待发送" >> $LOG
+    echo "$SLOT 已加入待发送: $PENDING_FILE" >> $LOG
 else
     echo "$SLOT 报告生成失败" >> $LOG
-fi
-
-# 收盘时同步触发 Hermes 策略优化
-if [ "$TRIGGER_HERMES" = "1" ]; then
-    echo "收盘触发 Hermes 策略优化..." >> $LOG
-    # Hermes 策略优化脚本由其自身 cron 在 15:30 触发，这里只记录
 fi
