@@ -86,6 +86,7 @@
 ### 已配置定时任务（Cron）
 | 任务 | 执行时间 | 脚本 |
 |------|----------|------|
+| GBrain Dreamcycle | 每天凌晨2点 | gbrain doctor 健康检查 |
 | 猎手持仓报告 | 周一至周五 9:30, 10:00, 10:30, 11:00, 13:30, 14:00, 14:30 | 收盘汇报.sh |
 | Hermes策略复盘 | 每个交易日15:30 | run_strategy_analysis.sh |
 | Hermes每日总结 | 每天22:00 | run_daily_summary.sh |
