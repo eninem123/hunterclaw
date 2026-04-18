@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "skills": {
+    "openclaw-tavily-search": {
+      "version": "0.1.0",
+      "installedAt": 1774930729900
+    },
+    "summarize": {
+      "version": "1.0.0",
+      "installedAt": 1774930731690
+    },
+    "memory-hygiene": {
+      "version": "1.0.0",
+      "installedAt": 1774930733839
+    },
+    "github": {
+      "version": "1.0.0",
+      "installedAt": 1774930735402
+    },
+    "agent-browser-clawdbot": {
+      "version": "0.1.0",
+      "installedAt": 1774930736967
+    },
+    "tencentcloud-lighthouse-skill": {
+      "version": "1.0.0",
+      "installedAt": 1774930739295
+    },
+    "tencent-docs": {
+      "version": "1.0.22",
+      "installedAt": 1774930744794
+    },
+    "tencent-cos-skill": {
+      "version": "1.0.6",
+      "installedAt": 1774930747308
+    },
+    "tencent-meeting-skill": {
+      "version": "1.0.0",
+      "installedAt": 1774930749807
+    },
+    "ima-skills": {
+      "version": "1.1.2",
+      "installedAt": 1774930752559
+    },
+    "web-tools-guide": {
+      "version": "1.0.0",
+      "installedAt": 1775967059789
+    },
+    "ths-financial-data": {
+      "version": "1.0.0",
+      "installedAt": 1775774211873
+    },
+    "stock-analyst": {
+      "version": "1.0.0",
+      "installedAt": 1775774234937
+    },
+    "stock": {
+      "version": "",
+      "installedAt": 1775774275203
+    },
+    "openclaw-stock-data-skill": {
+      "version": "1.0.0",
+      "installedAt": 1775774312475
+    },
+    "stock-predictor": {
+      "version": "12.0.0",
+      "installedAt": 1775774329118
+    },
+    "ticai-lieshou": {
+      "version": "1.0.6",
+      "installedAt": 1775774471192
+    },
+    "get-stock-line": {
+      "version": "1.0.0",
+      "installedAt": 1775774577961
+    },
+    "stock-board": {
+      "version": "1.0.0",
+      "installedAt": 1775774886959
+    },
+    "cloudbase": {
+      "version": "1.18.0",
+      "installedAt": 1775776093976
+    },
+    "playwright-cli-openclaw": {
+      "version": "1.0.0",
+      "installedAt": 1775776110792
+    },
+    "eastmoney-tools": {
+      "version": "1.0.1",
+      "installedAt": 1775870087987
+    },
+    "jrj-quote-skill": {
+      "version": "1.0.1",
+      "installedAt": 1775870088810
+    },
+    "akshare-finance": {
+      "version": "1.0.0",
+      "installedAt": 1775870099179
+    },
+    "news-summary": {
+      "version": "1.0.1",
+      "installedAt": 1775870437505
+    },
+    "agent-memory": {
+      "version": "1.0.0",
+      "installedAt": 1775870460718
+    },
+    "self-evolution": {
+      "version": "",
+      "installedAt": 1775870651388
+    },
+    "ai-self-evolution": {
+      "version": "1.0.1",
+      "installedAt": 1775870674190
+    },
+    "china-stock-analysis": {
+      "version": "1.0.0",
+      "installedAt": 1776116509411
+    },
+    "ac-stock-ultrashort": {
+      "version": "1.0.0",
+      "installedAt": 1776116509796
+    },
+    "pdf-smart-tool-cn": {
+      "version": "1.1.0",
+      "installedAt": 1776116509877
+    },
+    "mortgage-calculator": {
+      "version": "2.0.1",
+      "installedAt": 1776116521451
+    },
+    "warren-buffett-investing": {
+      "version": "1.0.0",
+      "installedAt": 1776116521920
+    },
+    "ai-real-estate-cn": {
+      "version": "1.0.0",
+      "installedAt": 1776116522144
+    },
+    "pptx-generator": {
+      "version": "1.0.2",
+      "installedAt": 1776116536136
+    },
+    "travel-planning": {
+      "version": "1.0.1",
+      "installedAt": 1776116536584
+    },
+    "excel-xlsx": {
+      "version": "1.0.2",
+      "installedAt": 1776116536983
+    },
+    "project-management-2": {
+      "version": "0.1.0",
+      "installedAt": 1776116537162
+    },
+    "douyin-video-downloader": {
+      "version": "1.0.1",
+      "installedAt": 1776116549894
+    },
+    "video-generation-minimax": {
+      "version": "1.0.0",
+      "installedAt": 1776116550016
+    },
+    "image-studio": {
+      "version": "1.0.0",
+      "installedAt": 1776116550152
+    },
+    "investment-five-questions": {
+      "version": "1.0.0",
+      "installedAt": 1776116569438
+    },
+    "china-contract-review": {
+      "version": "1.0.0",
+      "installedAt": 1776116581807
+    },
+    "data-analyst-cn": {
+      "version": "1.0.23",
+      "installedAt": 1776116935952
+    },
+    "news-aggregator": {
+      "version": "1.0.3",
+      "installedAt": 1776116941799
+    },
+    "a-stock-real-time-monitor": {
+      "version": "1.0.0",
+      "installedAt": 1776116942206
+    },
+    "stock-screener-cn": {
+      "version": "1.0.0",
+      "installedAt": 1776116942269
+    },
+    "humanizer-text": {
+      "version": "2.1.1",
+      "installedAt": 1776116954493
+    },
+    "budget-vs-actual": {
+      "version": "98.0.2",
+      "installedAt": 1776116954669
+    },
+    "pua-debugging-pro": {
+      "version": "1.0.0",
+      "installedAt": 1776116954933
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "date": "2026-04-17",
+  "time": "15:42:21",
+  "market_return": -0.013199147148863501,
+  "total_strategies": 20,
+  "best_strategy": {
+    "fitness": 12.752188086676895,
+    "returns": 2.3455801369494678,
+    "sharpe": 3.8991295812000906,
+    "max_drawdown": -0.022435089774779204,
+    "win_rate": 0.465,
+    "trade_count": 3.4,
+    "gene_params": {
+      "ma_fast": 18,
+      "ma_slow": 25,
+      "ma_signal": 10,
+      "rsi_period": 19,
+      "rsi_overbought": 68,
+      "rsi_oversold": 25,
+      "volume_ma_period": 13,
+      "volume_multiplier": 1.2671806665183014,
+      "position_size": 0.4402688757096177,
+      "stop_loss_pct": 0.05008555989313683,
+      "take_profit_pct": 0.13513564445675974,
+      "max_hold_days": 17,
+      "weight_ma_cross": 0.2629611120747436,
+      "weight_rsi_signal": 0.1699989943574405,
+      "weight_volume": 0.30994004874112085,
+      "weight_trend": 0.257099844826695
+    }
+  },
+  "top_strategies": [
+    {
+      "rank": 1,
+      "fitness": 12.752188086676895,
+      "returns": 2.3455801369494678,
+      "sharpe": 3.8991295812000906,
+      "max_drawdown": -0.022435089774779204
+    },
+    {
+      "rank": 2,
+      "fitness": 10.774934677233034,
+      "returns": 1.722456141820365,
+      "sharpe": 4.029231976824404,
+      "max_drawdown": -0.01772863918953596
+    },
+    {
+      "rank": 3,
+      "fitness": 7.885437397377837,
+      "returns": 1.5249748534012657,
+      "sharpe": 3.2168947942146024,
+      "max_drawdown": -0.029195293733086842
+    },
+    {
+      "rank": 4,
+      "fitness": 0.0,
+      "returns": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0
+    },
+    {
+      "rank": 5,
+      "fitness": 0.0,
+      "returns": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0
+    }
+  ],
+  "evolution_stats": {
+    "elite_kept": 3,
+    "new_generated": 17
+  }
+}

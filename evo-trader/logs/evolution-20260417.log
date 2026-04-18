@@ -1,0 +1,51 @@
+✅ 使用数据获取模块 v2 (腾讯API)
+============================================================
+🚀 启动进化交易每日周期
+============================================================
+🔧 初始化进化交易系统...
+📊 更新行情数据...
+开始更新 0 只股票数据...
+数据更新完成，成功更新 0/0 只股票
+🧬 初始化策略池...
+  从文件加载 20 个策略
+  使用 0 只股票进行策略测试
+✅ 初始化完成
+
+📈 开始策略评估...
+✅ 策略评估完成，共测试 0 个策略
+
+🧬 执行策略进化...
+🏆 当前最优策略:
+  适应度: 0.0000
+  收益率: 0.00%
+  夏普比率: 0.00
+  最大回撤: 0.00%
+  胜率: 0.00%
+  交易次数: 0
+✅ 进化完成，淘汰弱策略，生成新策略
+
+📋 生成进化日报...
+获取K线数据失败 000001: Expecting value: line 1 column 1 (char 0)
+⚠️ 000001 使用模拟数据
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/evo-trader/src/main.py", line 291, in <module>
+    main()
+  File "/root/.openclaw/workspace/evo-trader/src/main.py", line 279, in main
+    report = trader.run_daily_cycle()
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.openclaw/workspace/evo-trader/src/main.py", line 240, in run_daily_cycle
+    report_text, report_data = self.generate_report()
+                               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.openclaw/workspace/evo-trader/src/main.py", line 130, in generate_report
+    market_df = self.fetcher.get_market_data(5)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.openclaw/workspace/evo-trader/src/data_fetcher_v2.py", line 187, in get_market_data
+    return self.get_daily_data('000001', days)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.openclaw/workspace/evo-trader/src/data_fetcher_v2.py", line 144, in get_daily_data
+    return self._generate_mock_data(symbol, days)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.openclaw/workspace/evo-trader/src/data_fetcher_v2.py", line 178, in _generate_mock_data
+    df = df.fillna(method='bfill').fillna(method='ffill')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: NDFrame.fillna() got an unexpected keyword argument 'method'

@@ -1,0 +1,15 @@
+=== GBrain Health Check Wed Apr 15 09:11:38 PM CST 2026 ===
+
+GBrain Health Check
+===================
+  [OK] connection: Connected, 177 pages
+  [WARN] pgvector: Could not check pgvector extension
+  [WARN] rls: Could not check RLS status
+  [OK] schema_version: Version 4 (latest: 4)
+  [OK] embeddings: 100% coverage, 0 missing
+
+All checks OK (some warnings).
+
+/usr/bin/env: ‘bun’: No such file or directory
+/usr/bin/env: ‘bun’: No such file or directory
+/usr/bin/env: ‘bun’: No such file or directory

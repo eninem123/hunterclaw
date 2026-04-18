@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "skills": {
+    "ths-financial-data": {
+      "name": "股票",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=ths-financial-data",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "stock-analyst": {
+      "name": "股票分析",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=stock-analyst",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "stock": {
+      "name": "stock",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=stock",
+      "source": "skillhub",
+      "version": ""
+    },
+    "openclaw-stock-data-skill": {
+      "name": "股票数据API",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=openclaw-stock-data-skill",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "stock-predictor": {
+      "name": "股票预测系统",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=stock-predictor",
+      "source": "skillhub",
+      "version": "12.0.0"
+    },
+    "ticai-lieshou": {
+      "name": "股票题材猎手 Stock Catalyst Hunter",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=ticai-lieshou",
+      "source": "skillhub",
+      "version": "1.0.6"
+    },
+    "get-stock-line": {
+      "name": "获取大A股票历史数据",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=get-stock-line",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "stock-board": {
+      "name": "股票打板筛选",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=stock-board",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "cloudbase": {
+      "name": "Cloudbase",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=cloudbase",
+      "source": "skillhub",
+      "version": "1.18.0"
+    },
+    "playwright-cli-openclaw": {
+      "name": "Playwright CLI Automation",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=playwright-cli-openclaw",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "eastmoney-tools": {
+      "name": "东方财富金融工具集",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=eastmoney-tools",
+      "source": "skillhub",
+      "version": "1.0.1"
+    },
+    "jrj-quote-skill": {
+      "name": "金融界A股行情数据",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=jrj-quote-skill",
+      "source": "skillhub",
+      "version": "1.0.1"
+    },
+    "akshare-finance": {
+      "name": "Akshare Finance",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=akshare-finance",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "news-summary": {
+      "name": "News Summary",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=news-summary",
+      "source": "skillhub",
+      "version": "1.0.1"
+    },
+    "agent-memory": {
+      "name": "Agent Memory",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=agent-memory",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "self-evolution": {
+      "name": "self-evolution",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=self-evolution",
+      "source": "skillhub",
+      "version": ""
+    },
+    "ai-self-evolution": {
+      "name": "AI自动进化工程，结合self-improvement技巧+实际运行总结而成",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=ai-self-evolution",
+      "source": "skillhub",
+      "version": "1.0.1"
+    }
+  }
+}

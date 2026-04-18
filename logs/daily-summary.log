@@ -1,0 +1,50 @@
+=== Summary 2026-04-13 ===
+🌙 【每日工作总结】2026-04-13
+━━━━━━━━━━━━━━━━━━━━
+
+🦞 【OpenClaw 工作】
+（今日暂无内存记录）
+
+📊 Git提交：
+
+
+━━━━━━━━━━━━━━━━━━━━
+
+🔮 【Hermes 工作】
+📊 猎手模拟交易：
+（今日暂无推演结果）
+
+📈 策略优化：
+（今日暂无策略分析）
+
+━━━━━━━━━━━━━━━━━━━━
+自动生成 07:56
+[plugins] [adp-openclaw] Plugin register() called
+[plugins] [adp-openclaw] Plugin registration complete
+[plugins] [memory-tdai] Registering plugin ... startTimestamp=1776038193717 (2026-04-12T23:56:33.717Z)
+[plugins] [memory-tdai] Config parsed: capture=true, recall=true(maxResults=5), extraction=true(dedup=true, maxMem=10), pipeline=(everyN=5, warmup=true, l1Idle=60s, l2DelayAfterL1=90s, l2Min=300s, l2Max=1800s, activeWindow=24h), persona(triggerEvery=50, backupCount=3, sceneBackupCount=10), memoryCleanup(enabled=false, retentionDays=(disabled), cleanTime=03:00, l0Dir=conversations, l1Dir=records)
+[plugins] [memory-tdai] Data dir: /root/.openclaw/memory-tdai (all subdirectories initialized)
+[plugins] [memory-tdai] Memory cleaner disabled (retentionDays not configured)
+[plugins] [memory-tdai] Registering before_prompt_build hook (auto-recall)
+[plugins] [memory-tdai] Embedding disabled by config, VectorStore will serve as metadata-only store
+[plugins] [memory-tdai][vector-store] FTS5 tables initialized (l1_fts, l0_fts) [schema v2 — jieba segmented]
+[plugins] [memory-tdai][vector-store] Initialized (dimensions=0)
+[plugins] [memory-tdai] VectorStore initialized: /root/.openclaw/memory-tdai/vectors.db (0D, provider=none)
+[plugins] [memory-tdai] [pipeline] Initialized: everyNConversations=5, warmup=enabled, l1IdleTimeout=60s, l2DelayAfterL1=90s, l2MinInterval=300s, l2MaxInterval=1800s, sessionActiveWindow=24h
+[plugins] [memory-tdai] Registering agent_end hook (auto-capture)
+[plugins] [memory-tdai] Plugin registration complete (v3). startTimestamp=1776038193717 (2026-04-12T23:56:33.717Z)
+[plugins] [memory-tdai] Registering plugin ... startTimestamp=1776038210810 (2026-04-12T23:56:50.810Z)
+[plugins] [memory-tdai] Config parsed: capture=true, recall=true(maxResults=5), extraction=true(dedup=true, maxMem=10), pipeline=(everyN=5, warmup=true, l1Idle=60s, l2DelayAfterL1=90s, l2Min=300s, l2Max=1800s, activeWindow=24h), persona(triggerEvery=50, backupCount=3, sceneBackupCount=10), memoryCleanup(enabled=false, retentionDays=(disabled), cleanTime=03:00, l0Dir=conversations, l1Dir=records)
+[plugins] [memory-tdai] Data dir: /root/.openclaw/memory-tdai (all subdirectories initialized)
+[plugins] [memory-tdai] Memory cleaner disabled (retentionDays not configured)
+[plugins] [memory-tdai] Registering before_prompt_build hook (auto-recall)
+[plugins] [memory-tdai] Embedding disabled by config, VectorStore will serve as metadata-only store
+[plugins] [memory-tdai][vector-store] FTS5 tables initialized (l1_fts, l0_fts) [schema v2 — jieba segmented]
+[plugins] [memory-tdai][vector-store] Initialized (dimensions=0)
+[plugins] [memory-tdai] VectorStore initialized: /root/.openclaw/memory-tdai/vectors.db (0D, provider=none)
+[plugins] [memory-tdai] [pipeline] Initialized: everyNConversations=5, warmup=enabled, l1IdleTimeout=60s, l2DelayAfterL1=90s, l2MinInterval=300s, l2MaxInterval=1800s, sessionActiveWindow=24h
+[plugins] [memory-tdai] Registering agent_end hook (auto-capture)
+[plugins] [memory-tdai] Plugin registration complete (v3). startTimestamp=1776038210810 (2026-04-12T23:56:50.810Z)
+Sent at Mon Apr 13 07:56:51 AM CST 2026
+Summary written to /root/.openclaw/workspace/pending-summaries/2026-04-13-summary.md at Mon Apr 13 07:59:39 AM CST 2026
+Summary written to /root/.openclaw/workspace/pending-summaries/2026-04-13-summary.md at Mon Apr 13 10:00:01 PM CST 2026
