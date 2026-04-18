@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "created": "2026-04-18",
+  "description": "Hermes 猎手策略技能树 - 自动进化",
+  "L3_Skills": [
+    {
+      "id": "stop-loss-discipline",
+      "name": "止损纪律",
+      "category": "风控",
+      "tags": [
+        "止损",
+        "纪律",
+        "铁律"
+      ],
+      "status": "active",
+      "source": "002439实战固化",
+      "created": "2026-04-15",
+      "score": 10
+    },
+    {
+      "id": "trend-following",
+      "name": "趋势跟踪策略",
+      "category": "选股",
+      "tags": [
+        "趋势",
+        "均线",
+        "动量"
+      ],
+      "status": "active",
+      "source": "实战+理论",
+      "created": "2026-04-18",
+      "score": 8
+    },
+    {
+      "id": "market-temperature",
+      "name": "市场温度模型",
+      "category": "择时",
+      "tags": [
+        "温度",
+        "量能",
+        "情绪"
+      ],
+      "status": "active",
+      "source": "猎手系统v2",
+      "created": "2026-04-18",
+      "score": 7
+    },
+    {
+      "id": "execution-discipline",
+      "name": "执行纪律",
+      "category": "风控",
+      "tags": [
+        "执行",
+        "不追高",
+        "回踩"
+      ],
+      "status": "active",
+      "source": "002439追高教训",
+      "created": "2026-04-15",
+      "score": 9
+    },
+    {
+      "id": "volume-divergence",
+      "name": "量价背离识别",
+      "category": "择时",
+      "tags": [
+        "背离",
+        "量价",
+        "预警"
+      ],
+      "status": "active",
+      "source": "Hermes策略评估",
+      "created": "2026-04-15",
+      "score": 8
+    }
+  ],
+  "L4_Archives": [
+    {
+      "date": "2026-04-15",
+      "code": "002439",
+      "name": "启明星辰",
+      "lesson": "追高执行+执行延迟",
+      "skill_refs": [
+        "execution-discipline",
+        "stop-loss-discipline"
+      ],
+      "outcome": "持有中，浮盈2%",
+      "lesson_type": "教训"
+    }
+  ],
+  "stats": {
+    "total_skills": 5,
+    "total_trades": 1,
+    "win_rate": null,
+    "avg_profit": null,
+    "total_profit_pct": null
+  }
+}
