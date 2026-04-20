@@ -155,3 +155,43 @@ if __name__ == "__main__":
 
     print()
     print(f"✅ 整理完成")
+
+    # ========== 6. 每周自诊 ==========
+    print()
+    print("6/6 每周自诊...")
+    issues = []
+
+    # 检查MEMORY.md中的待办是否过期（超过7天未完成）
+    memory_file = f"{WORKSPACE}/MEMORY.md"
+    if os.path.exists(memory_file):
+        with open(memory_file) as f:
+            mem = f.read()
+        # 检查是否有未完成的TODO
+        if '[ ]' in mem or '待办' in mem or 'TODO' in mem:
+            issues.append("MEMORY.md中有未完成的待办事项")
+
+    # 检查learnings中是否有错误模式重复出现
+    errors_file = f"{LOG_DIR}/ERRORS.md"
+    if os.path.exists(errors_file):
+        with open(errors_file) as f:
+            err = f.read()
+        lines = [l for l in err.split('
+') if l.startswith('## ')]
+        if len(lines) >= 5:
+            issues.append(f"ERRORS.md积累{len(lines)}条错误模式，需整理")
+
+    # 检查是否有连续失败（通过日志）
+    diag_log = f"{LOG_DIR}/self_diagnostic.log"
+    if os.path.exists(diag_log):
+        with open(diag_log) as f:
+            diag = f.read()
+        recent_fail = diag.count('FAIL') + diag.count('ERROR')
+        if recent_fail >= 3:
+            issues.append(f"近期失败{recent_fail}次，需分析根因")
+
+    if issues:
+        print(f"   ⚠️ 发现 {len(issues)} 项需关注:")
+        for issue in issues:
+            print(f"   - {issue}")
+    else:
+        print(f"   ✅ 自诊正常")
