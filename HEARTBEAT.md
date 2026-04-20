@@ -28,5 +28,27 @@
 - 当前小时 < 22：跳过
 - 当前小时 >= 22：发送，发送后删除
 
-### 6. 定期任务检查（非高峰时段）
+### 6. 每周记忆整理（周一 09:00）
+每周第一天检查是否需要整理：
+- 运行 `python3 /root/.openclaw/workspace/.learnings/memory_maintenance.py`
+- 清理临时文件、整理 learnings、更新 MEMORY.md
+- 每周一 heartbeat 时检查上次运行时间，超过7天则运行
+
+### 7. 每周技术情报（周日 20:00）
+每周最后一天检查 GitHub：
+- 运行 `python3 /root/.openclaw/workspace/.learnings/tech_research_scan.py`
+- 扫描 GitHub Trending，找到相关项目
+- 生成报告到 `/root/.openclaw/workspace/.learnings/tech_research/tech_intel_*.md`
+- 有发现则推送微信提醒用户
+
+### 8. 主动自我检查（非高峰时段，每3天一次）
+检查以下系统健康状态：
+- 数据源 API 是否正常（新浪财经）
+- 猎手信号校验四重门是否生效
+- 进化系统缓存是否正常
+- 信号队列是否有异常 pending 信号
+- 运行 `python3 /root/.openclaw/workspace/.learnings/self_diagnostic.py`
+- 有问题则推送微信提醒，正常则沉默（减少打扰）
+
+### 9. 定期任务检查（非高峰时段）
 - 每周一：GBrain 健康检查 + 猎手模拟交易积累回顾
