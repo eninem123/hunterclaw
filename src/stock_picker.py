@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-猎手系统 - 实盘选股器 v2.2
+猎手系统 - 实盘选股器 v2.3
 改进历史：
   v2.0 (2026-05-07):
     1. K线验证从3天→2天；新增qfqday兼容
@@ -10,7 +10,7 @@
     - 修复：东方财富行情接口重试机制
     - 修复：新浪量比字段为0时用换手率估算
     - 改进：动态阈值统一在外层apply，新浪数据源独立处理
-  v2.2 (2026-05-08):
+  v2.3 (2026-05-08):
     - 修复：删除创业板(30xxx)排除逻辑，科创板(688)同理，不得排除
     - 修复：偏冷模式阈值过高问题，改为更合理的梯度
     - 改进：市场温度综合三大指数，不再单看上证
@@ -198,6 +198,9 @@ def get_index_components_em():
                         continue
                     if price > 100 or price < 3:
                         continue
+                    # 涨停股排除（A股规则：涨停后几乎买不到）
+                    if chg_pct >= 9.8:
+                        continue
 
                     candidates.append({
                         "code": code, "name": name, "price": price,
@@ -269,6 +272,9 @@ def get_index_components_sina():
                 if "ST" in name or name.startswith("N"):
                     continue
                 if price > 100 or price < 3:
+                    continue
+                # 涨停股排除（A股规则：涨停后几乎买不到）
+                if chg_pct >= 9.8:
                     continue
 
                 candidates.append({
