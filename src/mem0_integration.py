@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Mem0分层记忆集成层
+Mem0分层记忆集成层 v2.0
 提供 save_trading_memory / search_trading_history / search_lessons 等接口
-供猎手系统各模块调用，自动注入 /root/mem0_venv 路径
 """
 
 import sys
-
-VENV_PATH = "/root/mem0_venv/lib/python3.11/site-packages"
-if VENV_PATH not in sys.path:
-    sys.path.insert(0, VENV_PATH)
 
 _connector = None
 
@@ -38,12 +33,6 @@ def _build_connector():
                     "path": "/root/mem0_db_hf",
                     "embedding_model_dims": 384
                 }
-            },
-            "embedder": {
-                "provider": "huggingface",
-                "config": {
-                    "model": "sentence-transformers/all-MiniLM-L6-v2"
-                }
             }
         })
 
@@ -68,11 +57,12 @@ def _build_connector():
                 return {"status": "healthy", "connected": True}
 
         return _Conn()
-    except Exception:
+    except Exception as e:
+        print(f"Mem0初始化失败: {e}")
         class _Null:
             def save_to_level(self, *a, **kw): return ''
             def search_from_level(self, *a, **kw): return []
-            def health_check(self): return {"status": "unhealthy", "connected": False}
+            def health_check(self): return {"status": "unhealthy", "connected": False, "error": str(e)}
         return _Null()
 
 def _get_connector():

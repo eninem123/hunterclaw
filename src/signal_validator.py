@@ -1,4 +1,4 @@
-#!/root/mem0_venv/bin/python3
+#!/usr/bin/env python3
 """
 猎手信号校验器 - 买入前强制检查清单 v2.0
 基于MEMORY.md实战教训：

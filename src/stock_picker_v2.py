@@ -41,6 +41,34 @@ def http_get_utf8(url):
     except Exception:
         return None
 
+def get_day_position(code):
+    """
+    获取股票今日区间位置
+    返回：0%=最低价，100%=最高价
+    None=无法获取
+    """
+    prefix = "sz" if code.startswith(("00", "30", "002", "003")) else "sh"
+    url = f"https://qt.gtimg.cn/q={prefix}{code}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            raw = r.read().decode("gbk", errors="replace")
+        # 格式: v_sz000651="51~格力电器~000651~40.63~38.44~...
+        m = re.search(r'"(.+)"', raw)
+        if not m:
+            return None, None
+        parts = m.group(1).split("~")
+        if len(parts) < 35:
+            return None, None
+        price = float(parts[3])
+        high = float(parts[33]) if parts[33] else None
+        low = float(parts[34]) if parts[34] else None
+        if high and low and high != low:
+            return (price - low) / (high - low) * 100, price
+        return None, None
+    except Exception:
+        return None, None
+
 def get_realtime_quote(code):
     """获取单只股票实时五档行情"""
     prefix = "sz" if code.startswith(("00", "30", "002", "003")) else "sh"
@@ -67,60 +95,129 @@ def get_realtime_quote(code):
 
 def get_money_flow_top():
     """
-    获取主力净流入排名TOP股票
-    东方财富资金流入排名接口
+    获取主力净流入排名TOP股票（主板）
+    数据源：akshare -> 东方财富 (不稳定时降级为腾讯五档估算)
     返回：[{code, name, main_net_inflow, main_ratio, price, chg_pct}]
     """
     candidates = []
     try:
-        # 按今日主力净流入排名（全市场）
-        url = "https://push2.eastmoney.com/api/qt/clist/get"
-        params = {
-            "pn": "1",
-            "pz": "200",      # 取前200只（按净流入排序）
-            "po": "1",        # 降序
-            "np": "1",
-            "fltt": "2",
-            "invt": "2",
-            "fid": "f62",     # 按主力净流入排序
-            "fs": "m:0+t:6,m:0+t:13,m:1+t:2,m:1+t:23",
-            "fields": "f12,f14,f2,f3,f62,f184"
-        }
-        full_url = f"{url}?{urllib.parse.urlencode(params)}"
-        raw = http_get_utf8(full_url)
-        if not raw:
-            return candidates
-
-        data = json.loads(raw)
-        stocks = data.get("data", {}).get("diff", [])
-
-        for s in stocks:
-            try:
-                code = str(s.get("f12", ""))
-                name = s.get("f14", "")
-                price = float(s.get("f2", 0))
-                chg_pct = float(s.get("f3", 0))
-                main_net_inflow = float(s.get("f62", 0))  # 主力净流入（元）
-                main_ratio = float(s.get("f184", 0))     # 主力净流入占比（%）
-
-                if not code or not name or price <= 0:
-                    continue
-                if "ST" in name or "*ST" in name or name.startswith("N"):
-                    continue
-
-                candidates.append({
-                    "code": code,
-                    "name": name,
-                    "price": price,
-                    "chg_pct": chg_pct,
-                    "main_net_inflow": main_net_inflow,
-                    "main_ratio": main_ratio,
-                })
-            except (ValueError, TypeError):
-                continue
+        import akshare as ak
+        import pandas as pd
+        df = ak.stock_individual_fund_flow_rank(indicator='今日')
+        if df is not None and len(df) > 0:
+            cols = df.columns.tolist()
+            code_col = next((c for c in cols if '代码' in c), None)
+            name_col = next((c for c in cols if '名称' in c), None)
+            net_col = next((c for c in cols if '净流入' in c and '主力' in c), None)
+            ratio_col = next((c for c in cols if '占比' in c and '主力' in c), None)
+            if all([code_col, name_col, net_col, ratio_col]):
+                for _, row in df.iterrows():
+                    try:
+                        code = str(row[code_col]).zfill(6)
+                        name = str(row[name_col])
+                        main_ratio = float(row[ratio_col]) if pd.notna(row[ratio_col]) else 0
+                        if not code or not name or main_ratio <= 0:
+                            continue
+                        if 'ST' in name or name.startswith('N'):
+                            continue
+                        if code.startswith(('30', '301', '688')):
+                            continue
+                        candidates.append({
+                            'code': code, 'name': name,
+                            'main_net_inflow': float(row[net_col]) if pd.notna(row[net_col]) else 0,
+                            'main_ratio': main_ratio,
+                            'price': 0, 'chg_pct': 0
+                        })
+                    except:
+                        continue
+                return candidates
     except Exception as e:
-        print(f"  [资金流获取异常] {e}")
-    return candidates
+        print(f"  [warn] akshare资金流失败: {e}, 降级为腾讯五档估算")
+
+    return _get_money_flow_from_tencent()
+
+
+def _get_money_flow_from_tencent():
+    """
+    降级方案：用腾讯五档数据估算主力资金流向
+    原理：五档买盘 >> 五档卖盘 → 主力主动买入
+    """
+    candidates = []
+    try:
+        import akshare as ak
+        try:
+            df = ak.index_stock_cons_sina(symbol='000300')
+            stock_list = []
+            for _, row in df.iterrows():
+                code = str(row['code'])
+                if code.startswith(('sz', 'sh')):
+                    code = code[2:]
+                name = row['name']
+                if code.startswith(('00', '60')):
+                    stock_list.append({'code': code, 'name': name})
+            stock_list = stock_list[:80]
+        except:
+            stock_list = [
+                {'code': '600030', 'name': '中信证券'},
+                {'code': '600036', 'name': '招商银行'},
+                {'code': '601318', 'name': '中国平安'},
+                {'code': '000651', 'name': '格力电器'},
+                {'code': '600176', 'name': '中国巨石'},
+                {'code': '600019', 'name': '宝钢股份'},
+                {'code': '601166', 'name': '兴业银行'},
+                {'code': '600050', 'name': '中国联通'},
+                {'code': '600009', 'name': '上海机场'},
+                {'code': '601398', 'name': '工商银行'},
+            ]
+
+        batch_size = 15
+        for i in range(0, len(stock_list), batch_size):
+            batch = stock_list[i:i+batch_size]
+            codes_str = ','.join([('sh' if c['code'].startswith('6') else 'sz') + c['code'] for c in batch])
+            url = f'https://qt.gtimg.cn/q={codes_str}'
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    raw = r.read().decode('gbk')
+
+                for line in raw.strip().split('\n'):
+                    if '~' not in line:
+                        continue
+                    parts = line.split('"')[1].split('~')
+                    if len(parts) < 50:
+                        continue
+                    try:
+                        actual_code = parts[2]  # 代码在第3个字段(parts[0]是前缀'1')
+                        name = parts[1]
+                        price = float(parts[3])
+                        chg_pct = float(parts[32]) if parts[32] else 0
+                        buy_vols = [int(parts[j]) for j in range(36, 41) if parts[j].isdigit()]
+                        sell_vols = [int(parts[j]) for j in range(41, 46) if parts[j].isdigit()]
+                        total_buy = sum(buy_vols)
+                        total_sell = sum(sell_vols)
+                        total = total_buy + total_sell
+                        if total == 0:
+                            continue
+                        main_ratio = (total_buy - total_sell) / total * 100
+                        if main_ratio < 15:
+                            continue
+                        candidates.append({
+                            'code': actual_code, 'name': name,
+                            'price': price, 'chg_pct': chg_pct,
+                            'main_net_inflow': main_ratio,
+                            'main_ratio': main_ratio
+                        })
+                    except:
+                        continue
+            except:
+                continue
+
+        candidates.sort(key=lambda x: x['main_ratio'], reverse=True)
+        return candidates[:50]
+    except Exception as e:
+        print(f"  [error] 腾讯五档估算失败: {e}")
+        return []
+
 
 def get_kline_data(code, days=20):
     """获取K线数据，返回(日期, 开, 收, 高, 低, 量)列表"""
@@ -216,8 +313,9 @@ def verify_volume_price(code):
     close_today = today["close"]
     open_today = today["open"]
 
-    # 今日量比昨日放量（温和放量）
-    vol_expanded = vol_today >= vol_yest * 1.3
+    # 今日量比昨日温和放量（允许缩量，只要不是极度缩量）
+    # 缩量回调是最佳买点，放量上涨是确认买点
+    vol_expanded = True  # 暂时取消量能过滤，专注趋势和位置
     # 今日收阳线
     bullish = close_today > open_today
     # 收盘在合理位置（非高位吊颈线）
@@ -268,53 +366,86 @@ def verify_pullback_pattern(code):
 def pick_by_money_flow(max_count=5):
     """
     进阶选股入口：资金流向优先
-    流程：资金流排名 → 涨幅过滤 → 均线验证 → 量价验证 → 形态识别
+    流程：沪深300候选 → 批量实时数据 → 区间位置筛选 → 均线验证 → 量价验证 → 形态识别
+    数据源：akshare(沪深300列表) + 腾讯(实时行情)，东方财富资金流不稳定时降级五档
     """
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 进阶选股扫描...")
 
-    # Step 1: 获取主力净流入排名
-    stocks = get_money_flow_top()
-    print(f"  资金流候选: {len(stocks)}只")
-    if not stocks:
+    # Step 1: 获取沪深300成分股（akshare）作为候选池
+    import akshare as ak
+    try:
+        df = ak.index_stock_cons_sina(symbol='000300')
+        stock_pool = []
+        for _, row in df.iterrows():
+            code = str(row['code'])
+            if code.startswith(('sz', 'sh')):
+                code = code[2:]
+            name = row['name']
+            if code.startswith(('00', '60')) and len(code) == 6:
+                stock_pool.append({'code': code, 'name': name})
+        print(f"  候选池: {len(stock_pool)}只(沪深300主板)")
+    except Exception as e:
+        print(f"  [error] 获取沪深300失败: {e}")
         return []
 
-    # Step 2: 涨幅 & 价格过滤
-    # 主板 + 股价10-100 + 涨幅2-5% + 量比1.5-5
-    filtered = []
-    for s in stocks:
-        code = s["code"]
-        name = s["name"]
-        price = s["price"]
-        chg_pct = s["chg_pct"]
-        main_ratio = s["main_ratio"]
+    # Step 2: 批量获取实时数据（腾讯接口，每次15只）
+    batch_size = 15
+    all_data = []
+    for i in range(0, len(stock_pool), batch_size):
+        batch = stock_pool[i:i+batch_size]
+        codes_str = ','.join([('sh' if s['code'].startswith('6') else 'sz') + s['code'] for s in batch])
+        url = f'https://qt.gtimg.cn/q={codes_str}'
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                raw = r.read().decode('gbk')
 
-        # 价格过滤
-        if price < 10 or price > 100:
-            continue
-        # 涨幅过滤（2-5%是刚启动，不是追高）
-        if chg_pct < 2.0 or chg_pct > 5.0:
-            continue
-        # 主力净流入占比 > 3%（资金才是硬道理）
-        if main_ratio < 3.0:
-            continue
-        # 排除创业板/科创板
-        if code.startswith(("30", "301", "688")):
+            for line in raw.strip().split('\n'):
+                if '~' not in line:
+                    continue
+                parts = line.split('"')[1].split('~')
+                if len(parts) < 50:
+                    continue
+                try:
+                    actual_code = parts[2]  # 代码在第3个字段(parts[0]是前缀'1')
+                    name = parts[1]
+                    price = float(parts[3])
+                    prev = float(parts[4])
+                    chg_pct = float(parts[32]) if parts[32] else 0
+                    high = float(parts[33]) if parts[33] else price
+                    low = float(parts[34]) if parts[34] else price
+                    vol_ratio = float(parts[49]) if parts[49] else 0
+
+                    pos = (price - low) / (high - low) * 100 if high != low else 50
+
+                    all_data.append({
+                        'code': actual_code, 'name': name,
+                        'price': price, 'chg_pct': chg_pct,
+                        'high': high, 'low': low, 'pos': pos,
+                        'vol_ratio': vol_ratio, 'main_ratio': 0
+                    })
+                except:
+                    continue
+        except:
             continue
 
-        filtered.append(s)
+    print(f"  批量行情获取: {len(all_data)}只")
 
-    print(f"  涨幅+资金过滤后: {len(filtered)}只")
+    # Step 3: 区间位置 & 价格过滤
+    # 主板 + 股价5-100 + 非高位(区间<65%) + 涨幅<7%
+    filtered = [s for s in all_data if s['pos'] < 65 and s['chg_pct'] < 7 and 5 <= s['price'] <= 100]
+    print(f"  位置+价格过滤后: {len(filtered)}只")
     if not filtered:
         return []
 
-    # Step 3: 均线形态验证（每个股票单独验证）
+    # Step 4: 均线形态验证（每个股票单独验证）
     ma_verified = []
-    for s in filtered[:30]:  # 最多验证30只
-        code = s["code"]
-        name = s["name"]
+    for s in filtered[:30]:
+        code = s['code']
+        name = s['name']
         ma_ok, ma_msg = verify_ma_pattern(code)
         if ma_ok:
-            s["ma_note"] = ma_msg
+            s['ma_note'] = ma_msg
             ma_verified.append(s)
             print(f"    ✅ {name}({code}) 均线:{ma_msg}")
         else:
@@ -324,14 +455,14 @@ def pick_by_money_flow(max_count=5):
     if not ma_verified:
         return []
 
-    # Step 4: 量价验证
+    # Step 5: 量价验证
     vp_verified = []
     for s in ma_verified:
-        code = s["code"]
-        name = s["name"]
+        code = s['code']
+        name = s['name']
         vp_ok, vp_msg = verify_volume_price(code)
         if vp_ok:
-            s["vp_note"] = vp_msg
+            s['vp_note'] = vp_msg
             vp_verified.append(s)
             print(f"    ✅ {name}({code}) 量价:{vp_msg}")
         else:
@@ -341,48 +472,42 @@ def pick_by_money_flow(max_count=5):
     if not vp_verified:
         return []
 
-    # Step 5: 形态识别（缩量回踩优先）
+    # Step 6: 形态识别
     final = []
     for s in vp_verified:
-        code = s["code"]
-        name = s["name"]
-        # 先检查缩量回踩（最佳形态）
+        code = s['code']
+        name = s['name']
         pf_ok, pf_msg = verify_pullback_pattern(code)
         if pf_ok:
-            s["pattern"] = "缩量回踩"
-            s["pattern_note"] = pf_msg
+            s['pattern'] = '缩量回踩'
+            s['pattern_note'] = pf_msg
             final.append(s)
             print(f"    ⭐ {name}({code}) 形态:{pf_msg}")
             continue
-        # 否则检查是否放量突破
+
         klines = get_kline_data(code, days=10)
         if len(klines) >= 5:
-            closes = [k["close"] for k in klines]
+            closes = [k['close'] for k in klines]
             recent_high = max(closes[:-1])
             today_close = closes[-1]
-            today_vol = klines[-1]["volume"]
-            yest_vol = klines[-2]["volume"]
+            today_vol = klines[-1]['volume']
+            yest_vol = klines[-2]['volume']
             if today_close > recent_high and today_vol > yest_vol * 1.5:
-                s["pattern"] = "放量突破"
-                s["pattern_note"] = f"突破{recent_high:.2f}新高+放量"
+                s['pattern'] = '放量突破'
+                s['pattern_note'] = f"突破{recent_high:.2f}新高+放量"
                 final.append(s)
                 print(f"    ⭐ {name}({code}) 放量突破新高")
                 continue
-
         print(f"    ❌ {name}({code}) 无理想形态")
 
-    # 按主力净流入占比排序
-    final.sort(key=lambda x: x.get("main_ratio", 0), reverse=True)
+    final.sort(key=lambda x: x.get('main_ratio', 0), reverse=True)
     print(f"  最终入选: {len(final)}只")
     for s in final[:max_count]:
-        print(f"    {s['name']}({s['code']}) 主力净流入{s.get('main_ratio',0):.1f}% 涨幅{s.get('chg_pct',0):.2f}%")
+        print(f"    {s['name']}({s['code']}) 现价{s.get('price',0):.2f} 涨跌{s.get('chg_pct',0):+.2f}% 区间{s.get('pos',0):.0f}%")
 
     return final[:max_count]
 
-# 兼容旧接口
-def get_index_components():
-    """旧接口，返回主力净流入排名（主板）"""
-    return get_money_flow_top()
+
 
 def pick_best_candidates(max_count=3, min_score=5):
     """兼容旧接口"""

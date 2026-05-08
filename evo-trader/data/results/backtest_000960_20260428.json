@@ -1,0 +1,20 @@
+{
+  "stock": "000960",
+  "name": "锡业股份",
+  "date": "2026-04-28",
+  "period_days": 120,
+  "metrics": {
+    "initial_capital": 100000,
+    "final_capital": 100000,
+    "total_return_pct": 0.0,
+    "total_trades": 0,
+    "win_trades": 0,
+    "loss_trades": 0,
+    "win_rate": 0.0,
+    "avg_win": 0,
+    "avg_loss": 0,
+    "max_win_pct": 0,
+    "max_loss_pct": 0
+  },
+  "trades": []
+}

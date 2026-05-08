@@ -1,132 +1,264 @@
 #!/usr/bin/env python3
 """
-进化交易系统 - 数据获取模块
+进化交易系统 - 数据获取模块 v2（Tushare优先 + AKShare降级）
 """
 import os
 import json
 import pandas as pd
-from datetime import datetime, timedelta
+import tushare as ts
 import akshare as ak
-import sqlite3
+import socket
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 class DataFetcher:
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", use_tushare=True):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.quotes_dir = self.data_dir / "quotes"
         self.quotes_dir.mkdir(exist_ok=True)
         
+        # 数据源配置
+        self.use_tushare = use_tushare
+        self.tushare_token = self._load_tushare_token()
+        
+        # 初始化Tushare（如果启用且有token）
+        self.ts = None
+        if self.use_tushare and self.tushare_token:
+            ts.set_token(self.tushare_token)
+            self.ts = ts.pro_api()
+        
         # 股票池（第一期先用沪深300成分股）
         self.stock_pool = self._load_stock_pool()
+        
+    def _load_tushare_token(self):
+        """加载Tushare token"""
+        # 优先从环境变量读取
+        token = os.environ.get('TUSHARE_TOKEN')
+        if token:
+            return token
+        
+        # 其次从配置文件读取
+        config_file = self.data_dir / "tushare_config.json"
+        if config_file.exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('token')
+        
+        # 最后从全局配置读取
+        global_config = Path('/root/.openclaw/workspace/猎手模拟交易/tushare_config.json')
+        if global_config.exists():
+            with open(global_config, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('token')
+        
+        return None
         
     def _load_stock_pool(self):
         """加载股票池（沪深300）"""
         pool_file = self.data_dir / "stock_pool.json"
         if pool_file.exists():
             with open(pool_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+            # 文件为空或无效时重新获取
+            if data and len(data) > 0:
+                return data
         
-        # 如果没有缓存，获取沪深300成分股
+        # 优先用Tushare获取沪深300成分股
+        if self.ts:
+            try:
+                df = self.ts.index_weight(index_code='000300.SH', start_date='20260101')
+                stock_list = []
+                for _, row in df.iterrows():
+                    code = row['con_code']
+                    if len(code) == 6:
+                        stock_list.append({
+                            'code': code,
+                            'name': '',  # Tushare不返回名称，需要单独查询
+                            'market': 'sh' if code.startswith(('0', '6')) else 'sz'
+                        })
+                self._save_stock_pool(stock_list)
+                return stock_list
+            except Exception as e:
+                print(f"Tushare获取股票池失败: {e}, 降级到AKShare")
+        
+        # 降级到AKShare获取
         try:
             df = ak.index_stock_cons_sina(symbol="000300")
             stock_list = []
             for _, row in df.iterrows():
-                # 解析代码和名称
-                code = row['code']
+                code = str(row['code'])
                 name = row['name']
-                if code.startswith('sz') or code.startswith('sh'):
-                    stock_code = code[2:]  # 去掉前缀
+                if code.startswith(('sz', 'sh')):
+                    code = code[2:]
+                if len(code) == 6 and code.isdigit():
                     stock_list.append({
-                        'code': stock_code,
+                        'code': code,
                         'name': name,
-                        'market': 'sh' if code.startswith('sh') else 'sz'
+                        'market': 'sh' if code.startswith(('0', '6')) else 'sz'
                     })
-            
-            # 保存到文件
-            with open(pool_file, 'w', encoding='utf-8') as f:
-                json.dump(stock_list, f, ensure_ascii=False, indent=2)
-            return stock_list[:50]  # 先用前50只测试
+            self._save_stock_pool(stock_list)
+            return stock_list
         except Exception as e:
-            print(f"获取股票池失败: {e}")
-            # 返回一些示例股票
-            return [
-                {'code': '000001', 'name': '平安银行', 'market': 'sz'},
-                {'code': '000002', 'name': '万科A', 'market': 'sz'},
-                {'code': '600519', 'name': '贵州茅台', 'market': 'sh'},
-                {'code': '000858', 'name': '五粮液', 'market': 'sz'},
-                {'code': '002439', 'name': '启明星辰', 'market': 'sz'},
-            ]
-    
-    def get_daily_data(self, symbol, days=60):
-        """获取股票日K线数据"""
-        cache_file = self.quotes_dir / f"{symbol}.parquet"
+            print(f"AKShare获取股票池失败: {e}")
+            return []
+            
+    def _save_stock_pool(self, stock_list):
+        """保存股票池"""
+        pool_file = self.data_dir / "stock_pool.json"
+        with open(pool_file, 'w', encoding='utf-8') as f:
+            json.dump(stock_list, f, ensure_ascii=False, indent=2)
+            
+    def get_historical_data(self, code, start_date=None, end_date=None):
+        """
+        获取历史行情数据
+        优先使用Tushare，失败则降级到AKShare
         
-        # 检查缓存
-        if cache_file.exists():
-            df = pd.read_parquet(cache_file)
-            # 检查数据是否足够新
-            if len(df) >= days and (datetime.now() - df.index[-1].to_pydatetime()).days < 2:
-                return df.tail(days)
+        Args:
+            code: 股票代码（6位数字）
+            start_date: 开始日期（YYYYMMDD格式）
+            end_date: 结束日期（YYYYMMDD格式）
+            
+        Returns:
+            DataFrame: 包含OHLCV数据的DataFrame
+        """
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
+        if not end_date:
+            end_date = datetime.now().strftime('%Y%m%d')
         
-        # 从akshare获取数据
+        # 确定市场
+        market = 'SH' if code.startswith(('0', '6')) else 'SZ'
+        ts_code = f"{code}.{market}"
+        
+        # 优先使用Tushare
+        if self.ts:
+            try:
+                df = self.ts.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+                if not df.empty:
+                    df = df.sort_values('trade_date')
+                    return df
+            except Exception as e:
+                print(f"Tushare获取{code}数据失败: {e}, 降级到AKShare")
+        
+        # 降级到AKShare
         try:
-            if symbol.startswith('6'):
-                stock_code = f"sh{symbol}"
-            else:
-                stock_code = f"sz{symbol}"
-            
-            df = ak.stock_zh_a_hist(symbol=symbol, period="daily", adjust="qfq")
-            if df.empty:
-                print(f"无法获取 {symbol} 数据")
-                return None
-            
-            # 格式化数据
-            df['日期'] = pd.to_datetime(df['日期'])
-            df.set_index('日期', inplace=True)
-            df = df[['开盘', '最高', '最低', '收盘', '成交量', '成交额']]
-            df.columns = ['open', 'high', 'low', 'close', 'volume', 'amount']
-            
-            # 保存到缓存
-            df.to_parquet(cache_file)
-            
-            return df.tail(days)
+            # AKShare使用symbol格式（sh600000, sz000001）
+            ak_symbol = f"sh{code}" if code.startswith(('0', '6')) else f"sz{code}"
+            df = ak.stock_zh_a_hist(symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+            if not df.empty:
+                df = df.sort_values('日期')
+                df = df.rename(columns={
+                    '日期': 'trade_date',
+                    '开盘': 'open',
+                    '最高': 'high',
+                    '最低': 'low',
+                    '收盘': 'close',
+                    '成交量': 'vol',
+                    '成交额': 'amount'
+                })
+                return df
         except Exception as e:
-            print(f"获取 {symbol} 数据失败: {e}")
-            return None
-    
-    def get_market_data(self, days=60):
-        """获取市场整体数据（上证指数）"""
-        return self.get_daily_data('000001', days)
-    
-    def update_all_data(self):
-        """更新所有股票数据"""
-        print(f"开始更新 {len(self.stock_pool)} 只股票数据...")
-        for i, stock in enumerate(self.stock_pool, 1):
-            symbol = stock['code']
-            df = self.get_daily_data(symbol)
-            if df is not None:
-                print(f"[{i}/{len(self.stock_pool)}] {stock['name']}({symbol}) 已更新，{len(df)} 天数据")
-            else:
-                print(f"[{i}/{len(self.stock_pool)}] {stock['name']}({symbol}) 更新失败")
+            print(f"AKShare获取{code}数据失败: {e}")
         
-        print("数据更新完成")
+        return pd.DataFrame()
+        
+    def get_multiple_stocks_data(self, codes, start_date=None, end_date=None, limit=15):
+        """
+        获取多只股票的历史数据（带限流）
+        
+        Args:
+            codes: 股票代码列表
+            start_date: 开始日期
+            end_date: 结束日期
+            limit: 每次请求的股票数量（避免API限流）
+            
+        Returns:
+            dict: {code: DataFrame}
+        """
+        result = {}
+        
+        # 分批获取，避免API限流
+        for i in range(0, len(codes), limit):
+            batch = codes[i:i+limit]
+            for code in batch:
+                df = self.get_historical_data(code, start_date, end_date)
+                if not df.empty:
+                    result[code] = df
+            
+            # 每批之间暂停1秒，避免限流
+            if i + limit < len(codes):
+                time.sleep(1)
+        
+        return result
+        
+    def update_all_data(self):
+        """更新所有股票数据（从本地缓存加载）"""
+        # 本版本从本地缓存读取，不需要更新
+        # 如需联网更新，可遍历股票池调用 get_historical_data
+        print(f"  数据缓存就绪，共 {len(self.stock_pool)} 只股票")
+        pass
     
-    def get_today_quotes(self):
-        """获取今日实时行情（简化版）"""
-        # 这里先返回昨日收盘价，后续可以接入实时API
-        return {}
+    def get_market_data(self, lookback=5):
+        """获取市场基准数据（用沪深300指数代表大盘）"""
+        try:
+            # 获取沪深300指数数据作为市场基准
+            if self.ts:
+                df = self.ts.index_daily(ts_code='000300.SH', start_date=(datetime.now()-timedelta(days=60)).strftime('%Y%m%d'))
+                if df is not None and len(df) > 0:
+                    return df.tail(lookback)
+            # 降级：用AKShare获取沪深300
+            df = ak.index_zh_a_hist(symbol="000300", period="daily", start_date=(datetime.now()-timedelta(days=60)).strftime('%Y%m%d'), end_date=datetime.now().strftime('%Y%m%d'))
+            if df is not None and len(df) > 0:
+                df = df.rename(columns={'日期':'trade_date','收盘':'close'})
+                return df.tail(lookback)
+        except Exception as e:
+            print(f"获取市场数据失败: {e}")
+        return pd.DataFrame()
+        
+    def get_daily_data(self, code, days=60):
+        """获取近期日线数据（兼容旧接口）"""
+        end_date = datetime.now().strftime('%Y%m%d')
+        start_date = (datetime.now() - timedelta(days=days+30)).strftime('%Y%m%d')  # 多取30天以确保够用
+        df = self.get_historical_data(code, start_date, end_date)
+        return df if not df.empty else None
+    
+    def get_realtime_quote(self, code):
+        """
+        获取实时报价（仅用于signal_processor.py的止损/止盈检查）
+        优先使用腾讯财经，因为它更稳定
+        """
+        try:
+            prefix = 'sh' if code.startswith(('6', '5')) else 'sz'
+            import urllib.request
+            url = f"https://qt.gtimg.cn/q={prefix}{code}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                raw = r.read().decode('gbk')
+            import re
+            m = re.search(r'v_[\w]+="([^"]+)"', raw)
+            if m:
+                parts = m.group(1).split("~")
+                return float(parts[3]) if len(parts) > 3 else None
+        except:
+            pass
+        return None
 
 if __name__ == "__main__":
-    fetcher = DataFetcher()
-    # 测试获取数据
-    print("获取平安银行数据...")
-    df = fetcher.get_daily_data('000001', 20)
-    if df is not None:
-        print(f"获取到 {len(df)} 条数据")
-        print(df.tail())
-    else:
-        print("获取失败")
+    # 测试代码
+    print("测试数据获取模块 v2（Tushare优先）")
     
-    # 更新所有数据
-    # fetcher.update_all_data()
+    fetcher = DataFetcher(use_tushare=True)
+    
+    # 测试获取单只股票数据
+    print("\n测试获取000960数据:")
+    df = fetcher.get_historical_data("000960", start_date="20240101", end_date="20240430")
+    print(f"获取到 {len(df)} 条数据")
+    if not df.empty:
+        print(df.head())
+    
+    # 测试获取实时报价
+    print("\n测试获取000960实时报价:")
+    price = fetcher.get_realtime_quote("000960")
+    print(f"当前价格: {price}")

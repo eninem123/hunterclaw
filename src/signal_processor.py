@@ -14,6 +14,9 @@ from paper_trader import (
     paper_buy, paper_sell, check_stop_loss, check_take_profit,
     get_portfolio, get_state, get_positions, get_cash, print_portfolio
 )
+import sys
+sys.path.insert(0, '/root/.openclaw/workspace/猎手模拟交易/scripts')
+from debias_rules import HunterDebiasSystem
 
 SIGNAL_FILE = "/root/.hermes/猎手模拟交易/信号队列"
 PENDING_DIR = "/root/.hermes/猎手模拟交易/pending_confirm"
@@ -70,7 +73,34 @@ def process_signal(signal):
     if signal_status != "pending":
         return None, f"跳过非pending信号({signal_status})"
 
+    # 认知偏差自检层（v3.96+新增）
+    debias_system = HunterDebiasSystem()
+    bias_check_result = debias_system.check_all({
+        'decision_type': action,
+        'code': code,
+        'name': name,
+        'price': price,
+        'shares': shares,
+        'stop_loss': stop_loss,
+        'take_profit': take_profit,
+        'note': note,
+        'user_assumption': True if '收购' in note or '概率' in note else False,
+        'confidence': 0.85 if '85%' in note else 1.0,
+        'system_confidence': 1.0
+    })
+    
+    # 记录偏差检查到日志
+    if bias_check_result.warnings:
+        bias_warning_msg = f"认知偏差检测: {len(bias_check_result.warnings)} 个风险 | "
+        for warning in bias_check_result.warnings:
+            bias_warning_msg += f"  [{warning['severity']}] {warning['type']}: {warning['message']}"
+        log_execution("DEBIAS_CHECK", bias_warning_msg)
+    
     if action == "buy":
+        # 买入前偏差检查
+        if bias_check_result.warnings and any(w['severity'] == 'high' for w in bias_check_result.warnings):
+            # 高风险偏差：要求用户确认再执行
+            return False, f"⚠️ 检测到高风险认知偏差，需要您确认: {bias_check_result.debiased_decision.get('bias_warnings', [])}"
         ok, msg = paper_buy(
             code=code, name=name,
             price=price, shares=shares,
@@ -79,8 +109,12 @@ def process_signal(signal):
         )
         return ok, msg
 
-    elif action == "sell":
+    if action == "sell":
         current_price = get_current_price(code)
+        # 卖出前偏差检查
+        if bias_check_result.warnings and any(w['severity'] == 'high' for w in bias_check_result.warnings):
+            # 高风险偏差：要求用户确认再执行
+            return False, f"⚠️ 检测到高风险认知偏差，需要您确认: {bias_check_result.debiased_decision.get('bias_warnings', [])}"
         ok, msg = paper_sell(code, reason=note or "signal_sell", current_price=current_price)
         return ok, msg
 

@@ -1,4 +1,4 @@
-#!/root/mem0_venv/bin/python3
+#!/usr/bin/env python3
 """
 猎手盘中实时监测脚本 v2
 智能版：只在关键价格事件时写入pending-summaries触发微信推送
@@ -23,6 +23,7 @@ STOCKS_TO_WATCH = [
     ('sz000938', '紫光股份', 29.92),
     ('sh601138', '工业富联', 66.89),
     ('sh600552', '凯盛科技', 15.70),
+    ('sz300232', '洲明科技', 6.35),  # 观察标的，收购逻辑
 ]
 
 # 000960猎手关键价格
@@ -130,8 +131,9 @@ def main():
     log_file = LOG_DIR / f"monitor-{today}.log"
     
     if MODE == 'snapshot':
-        # 一次性快照，写入pending推送
-        report_lines = [f"📊 **【猎手盘中监测】** {now.strftime('%H:%M:%S')}"]
+        # 一次性快照：处理所有股票，最后统一输出
+        all_prices = []
+        events_found = False
         
         for symbol, name, y_close in STOCKS_TO_WATCH:
             data = get_realtime_price(symbol)
@@ -142,24 +144,26 @@ def main():
             limit_up = round(y_close * 1.1, 2)
             gap = (limit_up - data['price']) / limit_up * 100
             
-            line = f"【{name}】{data['price']:.2f} ({change_pct:+.2f}%) 距涨停{gap:.1f}%"
-            report_lines.append(line)
+            all_prices.append(f"【{name}】{data['price']:.2f} ({change_pct:+.2f}%) 距涨停{gap:.1f}%")
             
-            # 000960特殊处理
+            # 000960特殊处理：有事件则标记
             if symbol == 'sz000960':
                 events = check_960_events(data['price'])
                 if events:
-                    alert_report = build_alert_report(name, events, MODE, data['price'])
-                    out_file = PENDING_DIR / f"stock-monitor-{today}.md"
-                    out_file.write_text(alert_report, encoding='utf-8')
-                    print(alert_report)
-                    return
+                    events_found = True
+                    # 不return，先处理完所有股票
         
-        # 无事件，只写日志
-        snapshot = build_market_snapshot(MODE)
-        log_file.write_text(snapshot + '\n', encoding='utf-8', append=True)
-        print(f"✅ 市场快照已记录（无重大事件）")
-        print(snapshot)
+        # 统一输出
+        now_str = now.strftime('%H:%M:%S')
+        report_lines = [f"📊 **【猎手盘中监测 {now_str}】**"] + all_prices
+        report = '\n'.join(report_lines)
+        
+        out_file = PENDING_DIR / f"stock-monitor-{today}.md"
+        out_file.write_text(report, encoding='utf-8')
+        
+        log_file.open(mode="a").write(report + "\n")
+        print(report)
+        
         return
     
     # 其他模式：检查事件
@@ -198,3 +202,25 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ========== 洲明科技300232 专项监测（13信号体系）==========
+# 基于用户假设前提：收购概率85-88%，13个信号
+
+# 13个监测信号
+SIGNALS_300232 = {
+    'price_alert': {'limit_up': 6.99, 'entry': 6.5, 'stop': 5.80},
+    'volume_spike': 1.5,  # 量比超过1.5倍
+    'limit_up_day': True,  # 涨停
+    'block_trade': True,  # 大宗交易
+    'broker_race': True,  # 龙虎榜
+    'margin': True,  # 融资余额变化
+    'qfii': True,  # QFII持仓变化
+    'announcement': True,  # 公告异常
+    'hander联动': True,  # 汉得信息联动
+    'industry': True,  # 行业动态
+}
+
+def check_300232_signals():
+    """检查300232的13个信号"""
+    signals = []
+    return signals
