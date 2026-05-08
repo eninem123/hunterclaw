@@ -67,7 +67,30 @@ def get_position_prices(codes: dict) -> dict:
             p = m.group(2).split('~')
             if len(p) < 32:
                 continue
+            # prices字典以name为key（如"中信证券"）
             prices[p[1]] = {'price': float(p[3]), 'chg': float(p[32])}
+
+        # 备选：如果精确匹配失败，用持仓代码直接查（避免名称差异）
+        fallback_prices = {}
+        for name, code in codes.items():
+            url2 = f'https://qt.gtimg.cn/q={code}'
+            try:
+                req2 = urllib.request.Request(url2, headers={'User-Agent': 'Mozilla/5.0'})
+                resp2 = urllib.request.urlopen(req2, timeout=5)
+                raw2 = resp2.read().decode('gbk')
+                m2 = re.search(r'v_\w+="(.+)"', raw2)
+                if m2:
+                    p2 = m2.group(1).split('~')
+                    if len(p2) >= 32:
+                        fallback_prices[name] = {'price': float(p2[3]), 'chg': float(p2[32])}
+            except Exception:
+                pass
+
+        # 合并：精确匹配优先，fallback补充缺失
+        for name, fd in fallback_prices.items():
+            if name not in prices:
+                prices[name] = fd
+
         return prices
     except Exception as e:
         return {}

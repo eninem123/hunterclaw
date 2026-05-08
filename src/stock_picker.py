@@ -340,7 +340,7 @@ def get_index_components_em():
                     if price > 100 or price < 3:
                         continue
                     # 涨停股排除（A股规则：涨停后几乎买不到）
-                    if chg_pct >= 9.8:
+                    if chg_pct >= 8.5:  # 近涨停>=8.5%过滤，风险过高
                         continue
 
                     candidates.append({
@@ -415,7 +415,7 @@ def get_index_components_sina():
                 if price > 100 or price < 3:
                     continue
                 # 涨停股排除（A股规则：涨停后几乎买不到）
-                if chg_pct >= 9.8:
+                if chg_pct >= 8.5:  # 近涨停>=8.5%过滤，风险过高
                     continue
 
                 candidates.append({
