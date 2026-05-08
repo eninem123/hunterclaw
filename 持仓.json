@@ -15,13 +15,14 @@
     {
       "code": "159715",
       "name": "稀土ETF",
-      "entry_price": 1.349,
-      "shares": 2300,
-      "cost": 3103.0,
+      "entry_price": 1.308,
+      "shares": 900,
+      "cost": 1177.0,
       "buy_date": "2026-04-30",
-      "stop_loss": 1.28,
-      "take_profit": 1.46,
-      "status": "holding"
+      "stop_loss": 1.30,
+      "take_profit": 1.48,
+      "status": "holding",
+      "note": "今日减仓1000股@1.39，成本摊薄至1.308"
     },
     {
       "code": "300232",
