@@ -427,7 +427,9 @@ def format_report(report):
 if __name__ == "__main__":
     closing = "--closing" in sys.argv
     report = full_scan(closing_mode=closing)
+    report = add_confidence_to_report(report)
     print(format_report(report))
+    print(format_confidence_report(report))
 
     # 保存日志
     DATA_DIR.mkdir(exist_ok=True)
@@ -437,3 +439,149 @@ if __name__ == "__main__":
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     sys.exit(1 if report["verdict"] == "RISK_HIGH" else 0)
+
+# ══════════════════════════════════════════════════════════════════════
+# 猎手系统 v3.37 - 置信度标签系统
+# ══════════════════════════════════════════════════════════════════════
+
+CONFIDENCE_LEVELS = {
+    "HIGH": {"emoji": "🎯", "label": "高置信", "min": 75, "color": "green"},
+    "MEDIUM": {"emoji": "⚡", "label": "中置信", "min": 50, "color": "yellow"},
+    "LOW": {"emoji": "🎲", "label": "低置信", "min": 0, "color": "gray"},
+}
+
+SIGNAL_STRENGTH = {
+    "STRONG": {"emoji": "💎", "label": "强势信号", "min_score": 85},
+    "MODERATE": {"emoji": "📈", "label": "中性信号", "min_score": 60},
+    "WEAK": {"emoji": "📊", "label": "弱势信号", "min_score": 0},
+}
+
+def calculate_confidence(factors: dict) -> tuple:
+    """
+    计算综合置信度
+    因素: trend, volume, momentum, breadth, divergence
+    返回: (level, score, label)
+    """
+    weights = {"trend": 0.25, "volume": 0.20, "momentum": 0.20, "breadth": 0.20, "divergence": 0.15}
+    
+    score = 0
+    for factor, weight in weights.items():
+        factor_score = factors.get(factor, 50)  # 默认50分
+        score += factor_score * weight
+    
+    # 确定置信度级别
+    if score >= 75:
+        level, config = "HIGH", CONFIDENCE_LEVELS["HIGH"]
+    elif score >= 50:
+        level, config = "MEDIUM", CONFIDENCE_LEVELS["MEDIUM"]
+    else:
+        level, config = "LOW", CONFIDENCE_LEVELS["LOW"]
+    
+    label = config[chr(34) + "emoji" + chr(34)] + " " + config[chr(34) + "label" + chr(34)] + " (" + str(round(score)) + "%)"
+    return level, score, label
+
+def get_signal_strength(score: float) -> str:
+    """根据分数获取信号强度标签"""
+    if score >= 85:
+        config = SIGNAL_STRENGTH["STRONG"]
+    elif score >= 60:
+        config = SIGNAL_STRENGTH["MODERATE"]
+    else:
+        config = SIGNAL_STRENGTH["WEAK"]
+    return f'{config["emoji"]} {config["label"]}'
+
+def analyze_confidence_factors(index_data: dict, klines: list, breadth: dict, warnings: list) -> dict:
+    """
+    分析置信度因素
+    """
+    factors = {}
+    
+    # 趋势因子 (基于指数涨跌)
+    indices = index_data.get("indices", [])
+    if indices:
+        avg_pct = sum(i.get("pct", 0) for i in indices) / len(indices) if indices else 0
+        factors["trend"] = 50 + avg_pct * 5  # 涨跌映射到分数
+        factors["trend"] = max(0, min(100, factors["trend"]))
+    else:
+        factors["trend"] = 50
+    
+    # 成交量因子 (基于K线)
+    if klines and len(klines) >= 2:
+        recent_vol = klines[-1].get("volume", 0)
+        prev_vol = klines[-2].get("volume", 1)
+        vol_ratio = recent_vol / prev_vol if prev_vol > 0 else 1
+        factors["volume"] = min(100, 50 + (vol_ratio - 1) * 25)
+    else:
+        factors["volume"] = 50
+    
+    # 动量因子 (基于近期K线趋势)
+    if klines and len(klines) >= 3:
+        recent_changes = []
+        for i in range(-3, 0):
+            if i >= -len(klines):
+                k = klines[i]
+                recent_changes.append((k.get("close", 0) - k.get("open", 0)) / k.get("open", 1) * 100)
+        factors["momentum"] = 50 + sum(recent_changes) / len(recent_changes) * 5
+        factors["momentum"] = max(0, min(100, factors["momentum"]))
+    else:
+        factors["momentum"] = 50
+    
+    # 广度因子
+    up = breadth.get("up_indices", 0)
+    down = breadth.get("down_indices", 1)
+    breadth_ratio = up / (up + down) if (up + down) > 0 else 0.5
+    factors["breadth"] = breadth_ratio * 100
+    factors["breadth"] = max(0, min(100, factors["breadth"]))
+    
+    # 背离因子 (基于警告)
+    has_divergence = any("背离" in w.get("signal", "") for w in warnings)
+    has_anomaly = any("异动" in w.get("signal", "") for w in warnings)
+    factors["divergence"] = 30 if has_divergence else (60 if has_anomaly else 80)
+    
+    return factors
+
+def add_confidence_to_report(report: dict) -> dict:
+    """
+    为报告添加置信度标签
+    """
+    factors = analyze_confidence_factors(
+        report.get("index", {}),
+        report.get("klines", {}).get("sh000001", []),
+        report.get("breadth", {}),
+        report.get("warnings", [])
+    )
+    
+    level, score, label = calculate_confidence(factors)
+    signal_strength = get_signal_strength(score)
+    
+    report["confidence"] = {
+        "level": level,
+        "score": round(score, 1),
+        "label": label,
+        "factors": factors,
+        "signal_strength": signal_strength,
+        "version": "3.37"
+    }
+    
+    return report
+
+def format_confidence_report(report: dict) -> str:
+    """格式化置信度报告"""
+    conf = report.get("confidence", {})
+    lines = []
+    
+    lines.append(f"\n{'='*20}")
+    lines.append(f"【🎯 置信度分析 v3.37】")
+    lines.append(f"{'='*20}")
+    lines.append(f"  综合置信度: {conf.get(label, 'N/A')}")
+    lines.append(f"  信号强度: {conf.get(signal_strength, N/A)}")
+    
+    factors = conf.get("factors", {})
+    lines.append(f"\n  因子分解:")
+    lines.append(f"    📊 趋势: {factors.get(trend, 0):.1f}")
+    lines.append(f"    📦 成交量: {factors.get(volume, 0):.1f}")
+    lines.append(f"    ⚡ 动量: {factors.get(momentum, 0):.1f}")
+    lines.append(f"    🌊 广度: {factors.get(breadth, 0):.1f}")
+    lines.append(f"    🔄 背离: {factors.get(divergence, 0):.1f}")
+    
+    return "\n".join(lines)

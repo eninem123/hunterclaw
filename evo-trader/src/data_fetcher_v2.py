@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 try:
-    from tencent_api import TencentAPI
-    TENCENT_AVAILABLE = True
+    from sina_api import SinaFinanceAPI
+    DATA_SOURCE = "sina"
 except ImportError:
-    TENCENT_AVAILABLE = False
-    print("⚠️ 腾讯API模块未导入，将使用模拟数据")
+    DATA_SOURCE = None
+    print("⚠️ 新浪财经API模块未导入，将使用模拟数据")
 
 class DataFetcherV2:
     """数据获取模块 v2 - 腾讯API优先，失败时降级"""
@@ -27,7 +27,7 @@ class DataFetcherV2:
         self.quotes_dir.mkdir(exist_ok=True)
         
         # 初始化腾讯API
-        self.api = TencentAPI(str(self.quotes_dir)) if TENCENT_AVAILABLE else None
+        self.api = SinaFinanceAPI(str(self.quotes_dir))
         
         # 股票池
         self.stock_pool = self._load_stock_pool()
@@ -175,7 +175,7 @@ class DataFetcherV2:
         df['amount'] = df['close'] * df['volume']
         
         # 清理NaN
-        df = df.fillna(method='bfill').fillna(method='ffill')
+        df = df.bfill().ffill()
         
         # 只返回最近days天
         df = df.tail(days)

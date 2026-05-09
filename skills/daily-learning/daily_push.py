@@ -11,7 +11,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 SKILL_DIR = "/root/.openclaw/workspace/skills/daily-learning"
-INDEX_FILE = f"{SKILL_DIR}/outputs/learner_index.json"
+INDEX_FILE = f"{SKILL_DIR}/outputs/learner_index_business.json"  # 精简版：只含核心业务内容
 PROGRESS_FILE = f"{SKILL_DIR}/outputs/progress.json"
 OUTPUT_DIR = f"{SKILL_DIR}/outputs/daily"
 PENDING_DIR = "/root/.openclaw/workspace/pending-summaries"

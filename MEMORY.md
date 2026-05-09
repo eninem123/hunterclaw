@@ -1,215 +1,61 @@
 # MEMORY.md - Long-Term Memory
 
-## Alpha_Terminal 项目
+## 身份定位
+- 我是：腾讯龙虾（OpenClaw），AI驱动的A股量化交易Agent
+- 我的主人：谭成俊（唯一，只归属于主人）
+- 我的兄弟：扣子龙虾，互相学习、同步知识
 
-**项目路径：** `/root/Alpha_Terminal/`（GitHub 维护）
-**生产环境：** `/var/www/html/`（通过 nginx 提供服务，域名 www.aialter.site）
+## 核心任务（每日执行）
+- 猎手盘中监测（9:30-14:50）
+- 进化交易系统每日进化（15:40）
+- 每日优化迭代腾讯龙虾（上午）
+- A股投资知识学习（每小时）
 
-### 标准开发部署流程（每次改代码后必须执行）
+## 交易规则（固定）
+- 持仓：稀土ETF(159715)，900股，成本1.308元，止损1.30元，止盈1.48元
+- 航天电子(600879)：关注中，空仓，目标买入价24.9，止损23.75
+- 洲明科技(300232)：监测中，关注5/13员工持股计划节点
 
-1. 改源码 → `/root/Alpha_Terminal/`
-2. 同步生产 → `rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env*' /root/Alpha_Terminal/ /var/www/html/`
-3. 重启服务 → `sudo systemctl restart alpha-terminal`
-4. 推送 Git → `cd /root/Alpha_Terminal && git add . && git commit -m "描述" && git push`
+## 猎手执行守则
+1. 信号5分钟内未回踩 → 取消或降价
+2. 不追高买入
+3. 单日买入≤3次，单只持仓≤30%
 
-### 知识库模块
+## 数据真实性铁律（2026-05-04新增）
+- **严禁伪造数据**：拿不到真实数据MUST明确报告"无法获取真实数据，本次推演无效"，MUST NOT编造/推测/填充假数据
+- **交易日检查**：交易推演前MUST先执行 python3 /root/.openclaw/workspace/scripts/is_trading_day.py，非交易日跳过推演
+- 脚本路径：/root/.openclaw/workspace/scripts/is_trading_day.py
 
-- 知识库下拉框：直接展示 + 分页（每页5个），‹ › 分页按钮
-- API 端点：`POST /api/kb/list` 返回 10 个知识库
-- 状态提示：顶部显示"已选 X 个"和"第X页/共X页"
+## 资金博弈核心（2026-04-29同步）
+- 主力净流入占比>20%+股价涨 → 确认拉升
+- 主力净流入占比<-10% → 立即止损
+- 股价涨+主力净流出 → 诱多预警，禁止买入
+- 股价跌+主力净流入 → 低位吸筹
 
-### 技术栈
+## Alpha_Terminal项目
+- 源码：/root/Alpha_Terminal/
+- 生产：/var/www/html/（nginx，www.aialter.site）
+- 部署：rsync→systemctl restart→git push
 
-- 后端：Node.js（server.js），端口 8787（nginx 反代 80）
-- 前端：原生 HTML + JS（core.js），Tailwind 风格
-- IMA API Key：`8b6a36dd-d6c8-4e2a-b25f-9e7d3c1a8f9b`
+## 双Agent协作
+- Claw（我）：主对话、交易决策
+- Hermes：策略分析、记忆整理
 
-## 用户偏好
+## 持仓记录（2026-05-09同步扣子）
+| 时间 | 标的 | 数量 | 成本 | 止损 | 止盈 |
+|------|------|------|------|------|------|
+| 05-07 | 稀土ETF(159715) | 900股 | 1.308 | 1.30 | 1.48 |
 
-- 用户通过 openclaw-weixin 频道（微信）与我对话
-- 用户习惯：改完代码后我会自动同步、部署、重启，用户通过截图确认效果
+- 现金约5.4万 | 总仓位约6.7万
+- 策略版本：v3.8
+- 三位一体铁律：主力连续3日净流入才能买入
+- 高开低走应对：不追高，回落减仓，次日观望，仓位降至5成以下
 
-## 自动行为规则（每次对话都检查）
+## 执行时间表
+| 时间 | 任务 |
+|------|------|
+| 9:30 | 猎手开盘提醒 |
+| 14:55 | 撤退检查（核心决策点） |
+| 15:40 | 进化交易系统每日进化 |
 
-### 1. 代码改动后自动执行部署流程
-改源码 → `/root/Alpha_Terminal/` 后，立即（不需用户提醒）按顺序执行：
-1. `rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env*' /root/Alpha_Terminal/ /var/www/html/`
-2. `sudo systemctl restart alpha-terminal`
-3. `cd /root/Alpha_Terminal && git add . && git commit -m "描述" && git push`
-4. 告知用户已完成
-
-### 2. 涉及外部能力时自动找 Skill
-当用户询问以下类型问题时，优先检查是否有对应 skill：
-- 股票/行情/数据查询 → ths-financial-data、jrj-quote-skill、eastmoney-tools、akshare-finance
-- 财务/基本面分析 → stock-analyst、mx-finance-data
-- 网页搜索/信息获取 → tavily-search、eastmoney-fin-search、web-tools-guide
-- 宏观/全球经济数据 → mx-macro-data
-- 腾讯云/服务器管理 → tencentcloud-lighthouse-skill
-- 腾讯文档/会议/COS → 对应 skill
-
-先检查 workspace/skills/ 目录是否已有可用 skill，没有则调用 find-skills 搜索并推荐安装。
-
-## 双Agent协作系统
-
-### Agent身份分工
-- **🦞 Claw（我）**：主对话接口，项目管理，交易决策
-- **🔮 Hermes**：后台协作，记忆整理，策略优化（不直接对接微信）
-
-## 系统版本
-
-| 系统 | 版本 | 用途 |
-|------|------|------|
-| Hermes | v0.8.0 (最新) | 策略优化、记忆学习 |
-| OpenClaw | 2026.4.11 (最新) | 主对话/扩展能力 |
-
-### Hermes配置
-- **安装路径**：`/root/.hermes/hermes-agent/`
-- **配置**：`~/.hermes/config.yaml`, `~/.hermes/.env`
-- **模型**：MiniMax-M2.7（通过breeze API: api.svips.org）
-- **身份文件**：`~/.hermes/SOUL.md`
-
-### Hermes职责
-1. 记忆沉淀 - 整理重要决策和经验
-2. 策略复盘（交易日15:30）
-   - 对比推演预测 vs 市场实际
-   - 输出到 `~/.hermes/猎手模拟交易/策略优化建议.md`
-   - 🔴连续失败时标记提醒
-3. 第二视角分析
-
-### 协作规则
-- 用户 → Claw（直接响应）
-- 需要Hermes时 → Claw委托，Hermes分析，Claw转达
-- 所有项目由Claw管理，Hermes不独立操作
-
-## 待执行任务清单
-
-### 已配置定时任务（Cron）
-| 任务 | 执行时间 | 脚本 | 说明 |
-|------|----------|------|------|
-| GBrain Dreamcycle | 每天凌晨2点 | gbrain doctor 健康检查 | 大脑维护 |
-| 猎手-开盘提醒 | 9:30 工作日 | python3 hunter/scripts/run_scan.py --morning | 市场温度+仓位检查 |
-| 猎手-上午推演① | 10:00 工作日 | python3 hunter/scripts/run_scan.py | 盘中机会扫描 |
-| 猎手-上午推演② | 11:00 工作日 | python3 hunter/scripts/run_scan.py | 午盘方向判断 |
-| 猎手-下午开盘 | 13:00 工作日 | python3 hunter/scripts/run_scan.py --afternoon | 午后行情判断 |
-| 猎手-下午推演① | 14:00 工作日 | python3 hunter/scripts/run_scan.py | 下午盘中机会 |
-| 猎手-下午推演② | 14:30 工作日 | python3 hunter/scripts/run_scan.py | 尾盘准备 |
-| 猎手-撤退检查 | 14:55 工作日 | python3 hunter/scripts/run_scan.py --closing | **核心决策点** |
-| **进化交易系统-每日进化** | **15:40 工作日** | **python src/main.py --daily** | **策略进化日报（新）** |
-
-### 待执行（周一开盘）
-- 猎手系统开始推演（9:30起）
-- 周一15:40：进化交易系统首次运行
-- 持仓监控：启明星辰(002439) 止盈16.20，止损14.19
-
-## 猎手系统交易规则
-
-### 选股规则
-- 股价 > 100元 → 不考虑（100股起买，成本超1万）
-- 创业板（300开头）→ 不考虑（风险高）
-- 只做 A股主板（00/60/688开头）+ 基金
-
-### 新策略：市场温度模型
-| 市场温度 | 条件 | 操作 |
-|---------|------|------|
-| 冰点（<30℃）| 缩量 | 观望，不建仓 |
-| 暖意（≥50℃）+ 放量（≥5%）| 回暖信号 | 可试探建仓 |
-| 强势（≥80℃）| 明显放量 | 积极做多 |
-
-### 交易限制（绝对红线）
-- 单日买入 ≤ 3次
-- 单只持仓 ≤ 30%
-- **止损：-5%（红线，触发必走）**
-- **止盈：+8%（达标分批走）**
-- 熔断：总回撤≥3% → 禁止买入，必要时清仓
-
-## 双系统协同架构（猎手 + AI Hedge）
-
-### 系统定位
-- **AI Hedge Fund**（`/root/ai-hedge-fund/`）
-  - 定位：长线选股顾问
-  - 核心：12位投资大师 Agent（巴菲特、芒格、木头姐、Burry 等）
-  - 输入：美股/港股基本面、大师策略视角
-  - 输出：优质标的池 + 大师评级（bullish/neutral/bearish）
-
-## 进化交易系统（evo-trader）
-
-**项目路径：** `/root/.openclaw/workspace/猎手模拟交易/evo-trader/`
-**GitHub：** 集成在 `hunterclaw` 仓库
-**创建时间：** 2026-04-16
-
-### 核心功能
-- **遗传算法策略优化**：MA/RSI/成交量参数组合
-- **策略池管理**：20个策略，每日进化（保留3个精英）
-- **回测引擎**：支持止损止盈、手续费计算、夏普比率
-- **数据模块**：腾讯财经API + 模拟数据降级
-- **每日进化工作流**：初始化→评估→进化→报告
-
-### 定时执行
-- **每天15:40**（收盘后）：自动执行完整进化周期
-- **输出**：最优策略参数、策略排名、进化统计
-
-### 技术栈
-- Python 3.12 + pandas + numpy
-- 腾讯财经API（实时行情）
-- 本地缓存（parquet格式）
-
-### 当前状态
-- ✅ 数据模块：腾讯API实时行情正常
-- ⚠️ K线API：格式异常，已降级模拟数据
-- ✅ 策略框架：遗传算法完整
-- ✅ 定时任务：cron配置完成
-
----
-
-- **猎手系统**（Alpha_Terminal）
-  - 定位：短线狙击手
-  - 核心：技术面、资金流向、板块轮动
-  - 输入：A股 + 基金，择时快进快出
-  - 输出：买入信号 + -5%止损
-
-### 协同规则
-| 场景 | AI Hedge | 猎手 |
-|------|----------|------|
-| 选股 | ✅ 用大师眼光筛池子 | — |
-| 买点 | — | ✅ 技术面找时机 |
-| 止损 | 建议安全边际 | 严格执行-5% |
-| 持仓 | 定期复评 | 短线快出 |
-| 指令传递 | **只推荐，不下指令** | 独立决策 |
-
-### 工作流
-1. AI Hedge 选出"值得关注"的股票池（大师评级 bullish）
-2. 我把这些标的加入猎手观察列表
-3. 猎手每日扫描技术面/资金流向
-4. 出现买点 → 通知你
-5. 入场后严格-5%止损
-
-### API配置
-- MiniMax API：`sk-api-iZiz-X30hWc-Kl_z0fFw-ZZ_W052thjQNnfE0robIqRiq5ezCG62G9p_p9Mha5WQaH5L8DC5kc1LHT9NH8GJITalx3T9s_d6SCIqN9QzAwgUCgF1yekwueI`
-- Financial Datasets API：`39807e65-5395-4ecd-9f4a-8ab1da06e95c`
-- 端点：`https://api.minimaxi.com/v1`
-
-## 系统更新记录（2026-04-16）
-
-### 进化交易系统上线
-1. **数据模块修复**：新增 `tencent_api.py` + `data_fetcher_v2.py`
-2. **策略进化框架**：遗传算法策略池 + 回测引擎
-3. **cron作业更新**：替换“猎手-收盘复盘”为“进化交易系统-每日进化”
-4. **GitHub推送**：集成到 `hunterclaw` 仓库
-
-### Alpha_Terminal 优化
-1. **知识库筛选放宽**：扩展关键词范围（技术/商业/AI等）
-2. **搜索缓存**：5分钟缓存加速
-3. **防空列表**：避免返回空列表
-4. **服务重启**：同步生产环境
-
-### 当前持仓
-- **启明星辰(002439)**：400股，成本14.92元（含费用）
-- **止盈**：16.20元（+8%）
-- **止损**：14.19元（-5%）
-
-## API 充值记录
-
-| 时间 | 内容 | 备注 |
-|------|------|------|
-| 2026-04-13 | 充值 glm api | - |
-
+*精简版 | 2026-05-09同步扣子*

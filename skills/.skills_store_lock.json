@@ -102,6 +102,12 @@
       "zip_url": "https://lightmake.site/api/v1/download?slug=ai-self-evolution",
       "source": "skillhub",
       "version": "1.0.1"
+    },
+    "pmaster": {
+      "name": "pmaster",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=pmaster",
+      "source": "skillhub",
+      "version": ""
     }
   }
 }

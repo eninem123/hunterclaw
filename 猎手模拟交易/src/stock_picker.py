@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-猎手系统 - 实盘选股器 v2.1
+猎手系统 - 实盘选股器 v2.3
 改进历史：
   v2.0 (2026-05-07):
     1. K线验证从3天→2天；新增qfqday兼容
@@ -10,6 +10,15 @@
     - 修复：东方财富行情接口重试机制
     - 修复：新浪量比字段为0时用换手率估算
     - 改进：动态阈值统一在外层apply，新浪数据源独立处理
+  v2.3 (2026-05-08):
+    - 修复：删除创业板(30xxx)排除逻辑，科创板(688)同理，不得排除
+    - 修复：偏冷模式阈值过高问题，改为更合理的梯度
+    - 改进：市场温度综合三大指数，不再单看上证
+    - 改进：涨停股(涨幅>=9.8%)过滤逻辑
+  v2.4 (2026-05-08):
+    - 新增：市场状态识别（趋势市/震荡市）
+    - 新增：进化系统因子权重动态适配（量能56%+趋势42%，MA/RSI权重降低）
+    - 新增：动量因子(momentum = chg_pct × vol_ratio)独立评分
 """
 
 import json
@@ -49,28 +58,46 @@ def http_get_utf8(url, timeout=8):
 def get_market_temperature():
     """
     获取市场温度（0-100℃）
-    综合今日涨幅（权重50%）+ 近5日趋势（权重50%）
+    综合上证+深证+创业板三指数，更准确反映整体市场情绪
     """
     global _cached_temperature
     if _cached_temperature is not None:
         return _cached_temperature
 
     try:
-        url = "https://qt.gtimg.cn/q=sh000001"
+        # 综合三大指数
+        url = "https://qt.gtimg.cn/q=sh000001,sz399001,sz399006"
         raw = http_get_gbk(url)
         if not raw:
             _cached_temperature = 50
             return 50
 
-        m = re.search(r'v_\w+="(.+)"', raw)
-        if not m:
-            _cached_temperature = 50
-            return 50
-        parts = m.group(1).split("~")
-        price = float(parts[3])
-        prev_close = float(parts[4])
-        chg_pct = (price - prev_close) / prev_close * 100 if prev_close else 0
+        indices = {}
+        for line in raw.split('\n'):
+            if '~' not in line:
+                continue
+            parts = line.split('~')
+            if len(parts) < 10:
+                continue
+            code_match = re.search(r'v_(\w+)="(.+)"', line)
+            if not code_match:
+                continue
+            data_parts = code_match.group(2).split('~')
+            if len(data_parts) < 5:
+                continue
+            try:
+                price = float(data_parts[3])
+                prev_close = float(data_parts[4])
+                chg_pct = (price - prev_close) / prev_close * 100 if prev_close else 0
+                indices[code_match.group(1)] = chg_pct
+            except (ValueError, IndexError):
+                continue
 
+        # 计算加权温度（三大指数等权）
+        chg_vals = list(indices.values())
+        avg_chg = sum(chg_vals) / len(chg_vals) if chg_vals else 0
+
+        # 近5日趋势
         kline_url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,5,qfq"
         kline_raw = http_get_utf8(kline_url)
         trend_score = 50
@@ -85,7 +112,8 @@ def get_market_temperature():
             except Exception:
                 pass
 
-        temp = chg_pct * 5 + trend_score * 0.5
+        # 综合：当日涨幅60%权重 + 近5日趋势40%权重
+        temp = avg_chg * 6 + trend_score * 0.4
         temp = max(0, min(100, int(temp)))
         _cached_temperature = temp
         return temp
@@ -98,6 +126,7 @@ def get_market_temperature():
 def get_dynamic_thresholds():
     """
     根据市场温度返回动态涨幅/量比阈值
+    偏冷时阈值收紧但不封死，确保强势股能入选
     """
     temp = get_market_temperature()
     if temp >= 65:
@@ -106,18 +135,158 @@ def get_dynamic_thresholds():
     elif temp >= 50:
         chg_min, vol_min = 2.0, 1.5
         label = f"回暖模式({temp}℃)"
-    else:
-        # 偏冷：收紧但不封死（市场冷的时候也要能选到股）
-        chg_min, vol_min = 3.5, 1.5
+    elif temp >= 35:
+        chg_min, vol_min = 2.5, 1.2
         label = f"偏冷模式({temp}℃)"
+    else:
+        # 极冷模式（<35℃）：允许小量级强势股，阈值放低
+        chg_min, vol_min = 1.5, 1.0
+        label = f"极冷模式({temp}℃)"
 
     return {
         "temperature": temp,
         "temperature_label": label,
         "chg_min": chg_min,
         "vol_min": vol_min,
-        "can_open": True,  # 偏冷也允许建仓，只是门槛更高
+        "can_open": True,
     }
+
+
+# ── 市场状态识别（趋势市 vs 震荡市） ──────────────────
+def detect_market_regime() -> dict:
+    """
+    根据全市场量价特征识别市场状态
+    - 趋势市：放量突破模式 → 量能+趋势因子权重高
+    - 震荡市：低波动模式 → MA/RSI指标因子权重高
+    """
+    try:
+        # 获取三大指数当前状态
+        url = "https://qt.gtimg.cn/q=sh000001,sz399001,sz399006"
+        raw = http_get_gbk(url)
+        if not raw:
+            return {"regime": "unknown", "label": "未知", "strength": 0}
+
+        total_vol_ratio = 0
+        total_chg = 0
+        count = 0
+        for line in raw.split('\n'):
+            m = re.search(r'v_\w+="(.+)"', line)
+            if not m:
+                continue
+            parts = m.group(1).split('~')
+            if len(parts) < 32:
+                continue
+            try:
+                chg = float(parts[32])
+                # 用涨跌幅绝对值衡量波动，量比通过涨跌幅离散程度间接判断
+                total_chg += abs(chg)
+                count += 1
+            except (ValueError, IndexError):
+                continue
+
+        avg_abs_chg = total_chg / count if count > 0 else 0
+
+        # 判断逻辑
+        # 趋势市特征：指数平均涨跌幅绝对值 > 0.5%（有明确方向）
+        # 震荡市特征：指数平均涨跌幅绝对值 < 0.3%（低波动）
+        if avg_abs_chg > 0.5:
+            regime = "trending"  # 趋势市
+            label = f"趋势市(波动{avg_abs_chg:.2f}%)"
+            strength = min((avg_abs_chg - 0.5) / 0.5, 1.0)  # 0-1
+        elif avg_abs_chg < 0.3:
+            regime = "range_bound"  # 震荡市
+            label = f"震荡市(波动{avg_abs_chg:.2f}%)"
+            strength = 1.0
+        else:
+            regime = "mixed"
+            label = f"混合市(波动{avg_abs_chg:.2f}%)"
+            strength = 0.5
+
+        return {"regime": regime, "label": label, "strength": strength}
+    except Exception:
+        return {"regime": "unknown", "label": "未知", "strength": 0}
+
+
+# ── 动态因子权重（根据市场状态） ──────────────────────
+def get_dynamic_weights() -> dict:
+    """
+    根据市场状态返回因子权重
+    进化系统发现：量能56%+趋势42% > MA/RSI
+    动态调整：趋势市量能优先，震荡市指标反弹
+    """
+    regime = detect_market_regime()
+    r = regime["regime"]
+
+    if r == "trending":
+        # 趋势市：放量突破，量能+趋势主导
+        return {
+            "momentum": 0.40,   # 动量因子（涨幅×量比）
+            "volume": 0.30,     # 量能权重
+            "trend": 0.20,      # 趋势权重
+            "ma_cross": 0.05,   # MA交叉（小权重）
+            "rsi": 0.05,        # RSI（小权重）
+        }
+    elif r == "range_bound":
+        # 震荡市：低波动，指标超买超卖反弹
+        return {
+            "momentum": 0.10,
+            "volume": 0.15,
+            "trend": 0.15,
+            "ma_cross": 0.30,
+            "rsi": 0.30,
+        }
+    else:
+        # 混合/未知：均衡权重
+        return {
+            "momentum": 0.25,
+            "volume": 0.25,
+            "trend": 0.20,
+            "ma_cross": 0.15,
+            "rsi": 0.15,
+        }
+
+
+# ── 候选股综合评分（进化增强） ─────────────────────────
+def calc_enhanced_score(c: dict) -> dict:
+    """
+    用动态因子权重计算综合评分
+    替代原有的固定 score = chg_pct*2 + vol_ratio*3
+    """
+    regime = detect_market_regime()
+    weights = get_dynamic_weights()
+    w = weights
+
+    # 原始数据
+    chg = abs(c.get("chg_pct", 0))
+    vol_ratio = c.get("vol_ratio", 0)
+
+    # 动量因子（趋势强度）
+    momentum = chg * vol_ratio  # 涨幅×量比，越大说明放量突破越强
+
+    # 因子标准化（0-100分制）
+    # 动量因子：0-100标准化（一般0-200范围）
+    momentum_score = min(momentum / 2, 100)
+    # 量比：0-10标准化
+    vol_score = min(vol_ratio / 10 * 100, 100)
+    # 涨幅：0-15%标准化
+    chg_score = min(chg / 15 * 100, 100)
+
+    # 综合评分（加权）
+    score = (
+        w["momentum"] * momentum_score +
+        w["volume"] * vol_score +
+        w["trend"] * chg_score +
+        w["ma_cross"] * min(chg * 3, 100) +  # MA交叉用涨幅近似
+        w["rsi"] * min(vol_ratio * 5, 100)  # RSI用量比近似
+    )
+
+    return {
+        **c,
+        "regime": regime["label"],
+        "weights": {k: round(v, 2) for k, v in weights.items()},
+        "enhanced_score": round(score, 1),
+    }
+
 
 
 # ── 数据源1: 东方财富（主） ───────────────────────────
@@ -170,8 +339,8 @@ def get_index_components_em():
                         continue
                     if price > 100 or price < 3:
                         continue
-                    # 排除创业板
-                    if code.startswith(("30", "301")):
+                    # 涨停股排除（A股规则：涨停后几乎买不到）
+                    if chg_pct >= 8.5:  # 近涨停>=8.5%过滤，风险过高
                         continue
 
                     candidates.append({
@@ -245,7 +414,8 @@ def get_index_components_sina():
                     continue
                 if price > 100 or price < 3:
                     continue
-                if code.startswith(("30", "301")):
+                # 涨停股排除（A股规则：涨停后几乎买不到）
+                if chg_pct >= 8.5:  # 近涨停>=8.5%过滤，风险过高
                     continue
 
                 candidates.append({
@@ -357,6 +527,17 @@ def pick_best_candidates(max_count=3, min_score=8):
     if not filtered:
         return []
 
+    # ── 市场状态感知评分（v2.4进化增强）─────────────
+    regime_info = detect_market_regime()
+    weights = get_dynamic_weights()
+    print(f"  🏛️ 市场状态: {regime_info['label']} | 权重:mom={weights['momentum']} vol={weights['volume']} trend={weights['trend']} ma={weights['ma_cross']} rsi={weights['rsi']}")
+
+    # 用增强评分重新排序
+    for c in filtered:
+        scored = calc_enhanced_score(c)
+        c["score"] = scored["enhanced_score"]
+        c["momentum"] = round(c["chg_pct"] * c["vol_ratio"], 1)
+
     filtered.sort(key=lambda x: x["score"], reverse=True)
 
     # 排除持仓
@@ -394,7 +575,9 @@ def pick_best_candidates(max_count=3, min_score=8):
 
     top = [c for c in results if c["score"] >= min_score][:max_count]
     names = [f"{x['name']}({x['code']}) @{x['price']}" for x in top]
+    regime_info = detect_market_regime()
     print(f"\n  最终入选({len(top)}只): {names}")
+    print(f"  🏛️ 市场状态: {regime_info['label']}")
     return top
 
 

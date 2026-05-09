@@ -19,12 +19,18 @@ AUTO_TRADE_SCRIPT = "/root/.openclaw/workspace/猎手模拟交易/src/auto_trade
 
 # ── A股交易时间校验 ──
 def is_trading_day():
-    """检查今天是否是A股交易日（周一~周五，非节假日简版）"""
-    today = date.today()
-    # 周六周日休市
-    if today.weekday() >= 5:
-        return False
-    return True
+    """检查今天是否是A股交易日（使用真实交易日历，排除节假日）"""
+    # 导入同目录的交易日历模块
+    try:
+        from is_trading_day import is_trading_day as check_trading
+        return check_trading()
+    except ImportError:
+        # 备用：使用基础检查（周一~周五）
+        from datetime import date
+        today = date.today()
+        if today.weekday() >= 5:
+            return False
+        return True
 
 def is_trading_hours():
     """检查当前是否在A股交易时段（9:30-11:30 / 13:00-15:00）"""
@@ -53,9 +59,18 @@ if __name__ == "__main__":
         mode = "closing"
 
     # ── 非交易时段：只做持仓状态推送，不做买卖 ──
-    is_trading = is_trading_day() and is_trading_hours()
-    
+    today_is_trading = is_trading_day()
+    is_trading = today_is_trading and is_trading_hours()
+
+    if not today_is_trading:
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        today_label = weekday_names[date.today().weekday()]
+        print(f"📴 今日（{today_label}）为A股休市日，跳过行情扫描")
+        print("  休市期间不生成假行情数据")
+        sys.exit(0)
+
     if not is_trading:
+    
         weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
         today_label = weekday_names[date.today().weekday()]
         now_str = datetime.now().strftime("%H:%M")
@@ -64,16 +79,15 @@ if __name__ == "__main__":
         print("  如需查看持仓，请手动运行 auto_trade.py")
         
         # 非交易时段只执行持仓状态推送
-        if is_trading_day():
-            print("\n[run_scan] 非交易时段，持仓推送...")
-            try:
-                r = subprocess.run(
-                    ["python3", AUTO_TRADE_SCRIPT, "--status-only"],
-                    capture_output=True, text=True, timeout=60
-                )
-                print(r.stdout)
-            except Exception as e:
-                print(f"[auto_trade 调用失败] {e}")
+        print("\n[run_scan] 非交易时段，持仓推送...")
+        try:
+            r = subprocess.run(
+                ["python3", AUTO_TRADE_SCRIPT, "--status-only"],
+                capture_output=True, text=True, timeout=60
+            )
+            print(r.stdout)
+        except Exception as e:
+            print(f"[auto_trade 调用失败] {e}")
         sys.exit(0)
 
     closing_mode = (mode == "closing")

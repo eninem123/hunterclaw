@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-进化交易系统 - 主程序（修复版）
+进化交易系统 - 主程序
 """
 import os
 import sys
@@ -12,18 +12,7 @@ from pathlib import Path
 # 添加当前目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-# 尝试导入新的数据获取模块，失败时使用旧的
-try:
-    from data_fetcher_v2 import DataFetcherV2 as DataFetcher
-    print("✅ 使用数据获取模块 v2 (腾讯API)")
-except ImportError:
-    try:
-        from data_fetcher import DataFetcher
-        print("⚠️ 使用数据获取模块 v1 (akshare)")
-    except ImportError:
-        print("❌ 数据获取模块导入失败")
-        sys.exit(1)
-
+from data_fetcher import DataFetcher
 from strategy_gene import StrategyGene, StrategyPool
 from backtest import BacktestRunner
 
@@ -132,12 +121,19 @@ class EvolutionTrader:
         # 按适应度排序
         self.pool.strategies.sort(key=lambda x: x['fitness'], reverse=True)
         
-        # 获取市场数据
-        market_df = self.fetcher.get_market_data(5)
-        if market_df is not None and len(market_df) > 0:
-            market_return = (market_df['close'].iloc[-1] - market_df['close'].iloc[0]) / market_df['close'].iloc[0]
-        else:
-            market_return = 0.0
+        # 获取市场数据（使用缓存的指数数据，避免网络请求）
+        market_return = 0.0
+        try:
+            # 尝试从缓存读取沪深300数据
+            index_cache = self.data_dir / "quotes" / "000300.parquet"
+            if index_cache.exists():
+                import pandas as pd
+                mkt_df = pd.read_parquet(index_cache)
+                if len(mkt_df) >= 5:
+                    mkt_df = mkt_df.tail(5)
+                    market_return = (mkt_df['close'].iloc[-1] - mkt_df['close'].iloc[0]) / mkt_df['close'].iloc[0]
+        except Exception:
+            pass
         
         # 构建报告
         report = {
@@ -279,7 +275,7 @@ def main():
     
     if args.report:
         report_text, _ = trader.generate_report()
-        print("\n" + report_text)
+        print(report_text)
     
     if args.daily:
         report = trader.run_daily_cycle()

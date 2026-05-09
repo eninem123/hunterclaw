@@ -40,7 +40,7 @@ def wechat_notify(msg):
         path = Path(DELIVERY_QUEUE) / f"{entry['id']}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(entry, f, ensure_ascii=False)
-        print(f"[微信通知已推送] {msg[:50]}...")
+        print(f"[微信通知已推送] {msg[:200]}{'...' if len(msg) > 200 else ''}")
         return {"ok": True}
     except Exception as e:
         print(f"[通知失败] {e}")
@@ -197,6 +197,46 @@ def can_buy(state, portfolio, code, cost):
         return False
     return True
 
+from datetime import datetime, date
+
+
+def _sync_monitor_list(add_code=None, remove_code=None):
+    """买入/卖出后同步stock_monitor.py的STOCKS_TO_WATCH列表"""
+    monitor_path = "/root/.openclaw/workspace/猎手模拟交易/scripts/stock_monitor.py"
+    try:
+        with open(monitor_path, 'r') as f:
+            lines = f.readlines()
+        in_list = False
+        new_lines = []
+        for line in lines:
+            if 'STOCKS_TO_WATCH = [' in line:
+                in_list = True
+            if in_list and add_code and ('sh'+add_code in line or 'sz'+add_code in line):
+                in_list = False
+                continue
+            if in_list and remove_code and ('sh'+remove_code in line or 'sz'+remove_code in line):
+                continue
+            new_lines.append(line)
+            if in_list and line.strip().startswith('])'):
+                in_list = False
+        if add_code:
+            prefix = 'sh' if add_code.startswith('6') else 'sz'
+            entry = f"    ('{prefix}{add_code}', '{remove_code}', 0),\n"
+            inserted = False
+            result = []
+            for l in new_lines:
+                result.append(l)
+                if not inserted and "])" in l and l.strip() == "])":
+                    indent = len(l) - len(l.lstrip())
+                    result.insert(-1, ' ' * indent + entry)
+                    inserted = True
+            new_lines = result
+        with open(monitor_path, 'w') as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        print(f"[同步监控列表失败] {e}")
+
+
 def auto_buy(state, portfolio, code, name, price, shares):
     cost = price * shares
     if not can_buy(state, portfolio, code, cost):
@@ -228,31 +268,40 @@ def auto_buy(state, portfolio, code, name, price, shares):
     print(f"✅ 【自动买入】{name}({code}) {shares}股 @{price}元")
     print(f"   成本: ¥{cost:,.2f} | 止损: ¥{stop_loss} | 止盈: ¥{take_profit}")
     print(f"   今日买入: {state['today_buys']}/{MAX_BUYS_PER_DAY} | 剩余现金: ¥{portfolio['cash']:,.2f}")
+    _sync_monitor_list(add_code=code, remove_code=name)
     return True
 
 # ============ 自动卖出 ============
-def auto_sell(state, portfolio, code, reason):
+def auto_sell(state, portfolio, code, reason, current_prices=None):
+    _prices = current_prices if current_prices is not None else globals().get('current_prices', {})
     for i, pos in enumerate(portfolio["positions"]):
         if pos["code"] == code and pos["status"] == "holding":
-            portfolio["positions"].pop(i)
-            portfolio["cash"] += pos["cost"]
             entry = pos["entry_price"]
-            price = current_prices.get(code, entry)
+            price = _prices.get(code, entry)
+            # 卖出结算：按实际卖出价计算
+            sell_value = price * pos["shares"]
+            portfolio["positions"].pop(i)
+            portfolio["cash"] += sell_value  # 按现价结算，不是成本价
             pnl_pct = (price / entry - 1) * 100
             pnl_val = (price - entry) * pos["shares"]
             portfolio["history"].append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "action": "SELL_AUTO", "code": code, "name": pos["name"],
                 "reason": reason, "entry_price": entry, "cost": pos["cost"],
-                "sell_price": price, "pnl_pct": round(pnl_pct, 2)
+                "sell_price": price, "sell_value": sell_value,
+                "pnl_pct": round(pnl_pct, 2), "pnl_val": round(pnl_val, 2)
             })
             save_portfolio(portfolio)
             save_state(state)
+            emoji_pnl = "🟢" if pnl_val >= 0 else "🔴"
             msg = (f"📕 【自动卖出】\n股票：{pos['name']}({code})\n"
-                   f"卖出价：¥{price}\n盈亏：{pnl_pct:+.2f}% (¥{pnl_val:,.0f})\n"
+                   f"卖出价：¥{price} × {pos['shares']}股 = ¥{sell_value:,.2f}\n"
+                   f"{emoji_pnl} 盈亏：{pnl_pct:+.2f}% (¥{pnl_val:,.0f})\n"
                    f"原因：{reason}")
             wechat_notify(msg)
             print(f"✅ 【自动卖出】{pos['name']}({code}) 原因: {reason}")
+            print(f"   卖出: ¥{price} × {pos['shares']} = ¥{sell_value:,.2f} | PnL: {pnl_pct:+.2f}%")
+            _sync_monitor_list(remove_code=code)
             return True
     return False
 
@@ -304,7 +353,7 @@ def should_buy(state, market_temperature, volume_growth):
     if state["today_buys"] >= MAX_BUYS_PER_DAY:
         return False, f"今日买入{state['today_buys']}次已达上限"
     WARM_THRESHOLD = 50
-    VOLUME_GROWTH_MIN = 0.05
+    VOLUME_GROWTH_MIN = 0.03
     if market_temperature >= WARM_THRESHOLD and volume_growth >= VOLUME_GROWTH_MIN:
         return True, f"市场回暖(温度{market_temperature}℃ + 放量{volume_growth*100:+.1f}%)"
     return False, f"市场偏冷(温度{market_temperature}℃)或放量不足"
@@ -359,7 +408,7 @@ def push_portfolio_status(portfolio):
 
 # ============ 选股建仓 ============
 def execute_buy_candidates(state, portfolio):
-    """执行选股建仓（仅交易时段）"""
+    """执行选股建仓（仅交易时段）- 写入信号队列待确认，不直接买入"""
     try:
         from stock_picker import pick_best_candidates, calculate_buy_quantity
         import sys
@@ -367,15 +416,33 @@ def execute_buy_candidates(state, portfolio):
         candidates = pick_best_candidates(
             max_count=MAX_BUYS_PER_DAY - state["today_buys"], min_score=5
         )
+        signal_file = "/root/.hermes/猎手模拟交易/信号队列"
         for c in candidates:
             code, name, price = c["code"], c["name"], c["price"]
             shares = calculate_buy_quantity(price, portfolio["cash"], MAX_POSITION_PCT)
             if shares < 100:
                 print(f"  资金不足买入{name}({code})：计算{shares}股 < 100")
                 continue
-            success = auto_buy(state, portfolio, code, name, price, shares)
-            if success:
-                return True
+            stop_loss = round(price * (1 - STOP_LOSS_PCT / 100), 2)
+            take_profit = round(price * (1 + TAKE_PROFIT_PCT / 100), 2)
+            # 写信号到队列（代替直接买入）
+            signal = {
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "stock": code,
+                "name": name,
+                "action": "buy",
+                "price": price,
+                "shares": shares,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "note": c.get("note", "技术面入选 + 市场回暖"),
+                "bearish_reasons": c.get("bearish", "高位股注意回调"),
+                "status": "pending"
+            }
+            with open(signal_file, "a") as f:
+                f.write(json.dumps(signal, ensure_ascii=False) + "\n")
+            print(f"  ✅ 信号写入队列: {name}({code}) @ {price} × {shares}股")
+            return True
         return False
     except Exception as e:
         print(f"[选股建仓异常] {e}")
@@ -475,7 +542,7 @@ if __name__ == "__main__":
         print("非交易日，不执行任何交易操作")
     elif result["status"] == "NON_TRADING_HOURS":
         print(f"状态：非交易时段（已推送持仓）")
-        print(f"现金: ¥{result.get('cash', 'N/A'):,.2f}")
+        print(f"现金: ¥{result.get('cash', 0):,.2f}")
     else:
         print(f"市场温度: {result['market_temperature']}℃ (放量{result['volume_growth']*100:+.1f}%)")
         print(f"主力流入: {'是' if result['is_main_inflow'] else '否'}")

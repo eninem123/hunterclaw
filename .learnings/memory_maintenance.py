@@ -175,8 +175,7 @@ if __name__ == "__main__":
     if os.path.exists(errors_file):
         with open(errors_file) as f:
             err = f.read()
-        lines = [l for l in err.split('
-') if l.startswith('## ')]
+        lines = [l for l in err.split(chr(10)) if l.startswith('## ')]
         if len(lines) >= 5:
             issues.append(f"ERRORS.md积累{len(lines)}条错误模式，需整理")
 
