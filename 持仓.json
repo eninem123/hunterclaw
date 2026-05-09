@@ -1,68 +1,23 @@
 {
-  "cash": 50704.0,
+  "cash": 54000.0,
   "positions": [
-    {
-      "code": "600030",
-      "name": "中信证券",
-      "entry_price": 27.18,
-      "shares": 300,
-      "cost": 8154.0,
-      "buy_date": "2026-04-29 13:25",
-      "stop_loss": 26.8,
-      "take_profit": 28.5,
-      "status": "holding"
-    },
     {
       "code": "159715",
       "name": "稀土ETF",
       "entry_price": 1.308,
       "shares": 900,
       "cost": 1177.0,
-      "buy_date": "2026-04-30",
+      "buy_date": "2026-05-07",
       "stop_loss": 1.30,
       "take_profit": 1.48,
       "status": "holding",
-      "note": "今日减仓1000股@1.39，成本摊薄至1.308"
-    },
-    {
-      "code": "300232",
-      "name": "洲明科技",
-      "entry_price": 6.35,
-      "shares": 13700,
-      "cost": 87054.5,
-      "buy_date": "2026-04-30",
-      "stop_loss": 5.8,
-      "take_profit": 9.5,
-      "status": "holding",
-      "note": "收购逻辑，概率87%，盈亏比6:1，止损5.80"
-    },
-    {
-      "code": "688260",
-      "name": "昀冢科技",
-      "entry_price": 45.72,
-      "shares": 500,
-      "cost": 22860.0,
-      "buy_date": "2026-05-08",
-      "stop_loss": 42.52,
-      "take_profit": 52.58,
-      "status": "holding",
-      "note": "科创板，短期动量策略"
-    },
-    {
-      "code": "000678",
-      "name": "襄阳轴承",
-      "entry_price": 13.49,
-      "shares": 1000,
-      "cost": 13490.0,
-      "buy_date": "2026-05-08 13:36",
-      "stop_loss": 12.55,
-      "take_profit": 15.52,
-      "status": "holding",
-      "note": "猎手自动决策 | 主板+量比8.7+涨幅10%"
+      "note": "策略版本v3.8，三位一体铁律：主力连续3日净流入才能买入"
     }
   ],
-  "total_value": 185365.5,
-  "last_trade_date": "2026-05-08",
-  "market_temperature": 35,
-  "volume_growth": -0.189
+  "total_value": 67000.0,
+  "last_trade_date": "2026-05-07",
+  "market_temperature": 25,
+  "volume_growth": 0,
+  "strategy_version": "v3.8",
+  "notes": "2026-05-09同步扣子龙虾持仓数据"
 }
