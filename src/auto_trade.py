@@ -397,9 +397,10 @@ def push_portfolio_status(portfolio):
         cur = current_prices.get(pos["code"], pos["entry_price"])
         pnl = (cur / pos["entry_price"] - 1) * 100
         emoji = "🟢" if pnl >= 0 else "🔴"
+        tp1 = pos.get('take_profit_1', pos.get('take_profit'))
         lines.append(
             f"{emoji} {pos['name']} @{cur} ({pnl:+.2f}%)\n"
-            f"   止损{pos['stop_loss']} | 止盈{pos['take_profit']}"
+            f"   止损{pos['stop_loss']} | 止盈1 {tp1}"
         )
     lines.append(f"\n现金：¥{portfolio['cash']:,.0f}")
     lines.append(f"总市值：¥{total_value:,.0f}")
@@ -416,7 +417,8 @@ def execute_buy_candidates(state, portfolio):
         candidates = pick_best_candidates(
             max_count=MAX_BUYS_PER_DAY - state["today_buys"], min_score=5
         )
-        signal_file = "/root/.hermes/猎手模拟交易/信号队列"
+        today_str = date.today().isoformat()
+        signal_file = f"/root/.hermes/猎手模拟交易/信号队列/{today_str}_signals.jsonl"
         for c in candidates:
             code, name, price = c["code"], c["name"], c["price"]
             shares = calculate_buy_quantity(price, portfolio["cash"], MAX_POSITION_PCT)
