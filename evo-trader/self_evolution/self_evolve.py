@@ -12,6 +12,14 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+# 尝试加载IMA知识库桥接（可选，不影响核心功能）
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+    from ima_knowledge_bridge import get_market_context, enrich_stock_context
+    _HAS_IMA = True
+except ImportError:
+    _HAS_IMA = False
+
 DEEPSEEK_API = "https://api.deepseek.com/v1"
 DEEPSEEK_KEY = "sk-99fbf83aa6704057b2eae88dba14e88b"
 MODEL = "deepseek-v4-flash"
@@ -126,6 +134,19 @@ def main():
     strat = gather_strategy_data()
     print(f"  交易记录: {len(strat['trade_log'])}条")
 
+    # 2.5 IMA知识库上下文
+    ima_context = "（IMA知识库未连接）"
+    if _HAS_IMA:
+        try:
+            ctx = get_market_context("当前A股市场主线 2026")
+            if ctx:
+                ima_context = ctx
+                print("  📚 IMA知识库已加载市场情报")
+            else:
+                print("  📚 IMA知识库已连接，但未匹配到相关情报")
+        except Exception as e:
+            print(f"  ⚠️ IMA知识库加载异常: {e}")
+
     # 3. 构建提示词
     prompt = f"""你是量化交易策略专家。当前日期{datetime.now().strftime('%Y-%m-%d')}
 
@@ -138,6 +159,9 @@ def main():
 
 ## 当前持仓
 中信证券(600030): 买入价27.18元，止损26.23，止盈29.35，试探仓300股
+
+## IMA金融知识库参考
+{ima_context}
 
 ## 请输出以下分析（JSON格式，尽量详细）：
 

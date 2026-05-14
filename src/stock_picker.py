@@ -13,6 +13,13 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
+# IMA 知识库桥接（股票研报增强）
+try:
+    from ima_knowledge_bridge import enrich_stock_context, search_knowledge
+    _HAS_IMA = True
+except ImportError:
+    _HAS_IMA = False
+
 # ── 市场温度（全局缓存，避免每次都请求）───────────────
 _cached_temperature = None
 
@@ -495,6 +502,19 @@ def pick_best_candidates(max_count=3, min_score=8):
         c["kline_reason"] = reason
         c["is_new_stock"] = is_new
 
+        # IMA 研报知识增强评分
+        if ok and _HAS_IMA:
+            try:
+                ctx = enrich_stock_context(name, code)
+                if ctx:
+                    c["ima_ctx"] = ctx
+                    # 有研报支持的标的加分（最多+1.5分）
+                    kb_count = ctx.count("[AI读研报]")
+                    c["score"] = min(c["score"] + kb_count * 0.5, c["score"] + 1.5)
+                    print(f"  📖 {name}({code}) IMA研报发现{kb_count}篇 → 加分")
+            except Exception:
+                pass
+
         if ok:
             results.append(c)
             print(f"  ✅ {name}({code}) 涨幅{c['chg_pct']:+.2f}% 量比{c['vol_ratio']:.1f} {reason}")
@@ -506,6 +526,8 @@ def pick_best_candidates(max_count=3, min_score=8):
     top = [c for c in results if c["score"] >= min_score and c["chg_pct"] <= HIGH_GAIN_THRESHOLD][:max_count]
     names = [f"{x['name']}({x['code']}) @{x['price']}" for x in top]
     print(f"\n  最终入选({len(top)}只,涨幅<=5%): {names}")
+    if _HAS_IMA and top:
+        print(f"  📚 IMA知识增强: 候选标的有研报/课程数据支撑")
     print(f"  🏛️ 市场状态: {regime_info['label']}")
     return top
 
