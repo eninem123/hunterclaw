@@ -12,9 +12,9 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-BYEBUG_API = "https://api.minimax.chat/v1"
-BYEBUG_KEY = "sk-api-iZiz-X30hWc-Kl_z0fFw-ZZ_W052thjQNnfE0robIqRiq5ezCG62G9p_p9Mha5WQaH5L8DC5kc1LHT9NH8GJITalx3T9s_d6SCIqN9QzAwgUCgF1yekwueI"
-MODEL = "MiniMax-M2.7"
+DEEPSEEK_API = "https://api.deepseek.com/v1"
+DEEPSEEK_KEY = "sk-99fbf83aa6704057b2eae88dba14e88b"
+MODEL = "deepseek-v4-flash"
 
 EVO_DIR = Path(__file__).parent.parent
 STATE_FILE = EVO_DIR / "data" / "evolution_state.json"
@@ -24,7 +24,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def call_model(prompt: str, max_tokens: int = 8000) -> str:
-    """调用Byebug大模型（使用curl）"""
+    """调用DeepSeek大模型（使用curl，OpenAI兼容格式）"""
     payload = {
         "model": MODEL,
         "messages": [
@@ -37,8 +37,8 @@ def call_model(prompt: str, max_tokens: int = 8000) -> str:
 
     cmd = [
         "curl", "-s", "-X", "POST",
-        f"{BYEBUG_API}/chat/completions",
-        "-H", f"Authorization: Bearer {BYEBUG_KEY}",
+        f"{DEEPSEEK_API}/chat/completions",
+        "-H", f"Authorization: Bearer {DEEPSEEK_KEY}",
         "-H", "Content-Type: application/json",
         "-d", json.dumps(payload)
     ]
@@ -168,7 +168,7 @@ def main():
 ```"""
 
     # 4. 大模型分析
-    print("🤖 大模型深度分析中（mimo-v2.5-pro，8000 token）...")
+    print("🤖 大模型深度分析中（deepseek-v4-flash，8000 token）...")
     response = call_model(prompt, max_tokens=8000)
 
     # 5. 保存报告
