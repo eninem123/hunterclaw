@@ -1,0 +1,93 @@
+# 猎手交易分析Skill - 配置文件
+
+## 支付配置
+
+```yaml
+# config/payment.yaml
+alipay:
+  # 支付宝AppID（从SECRET.md获取）
+  app_id: "2021006149605908"
+  
+  # 收费配置
+  price: 0.05          # 单次调用价格（元）
+  unit: "次"           # 计费单位
+  
+  # 启用支付
+  enabled: true
+  
+  # 支付场景
+  scene: "ai_skill_trading"
+  
+  # 回调配置
+  callback:
+    success_url: ""    # 支付成功跳转URL
+    fail_url: ""       # 支付失败跳转URL
+
+## 功能定价
+
+pricing:
+  quick_query:
+    price: 0.02
+    description: "快速查询（股票信息、实时行情）"
+    daily_limit: 100
+  
+  standard_analysis:
+    price: 0.05
+    description: "标准分析（技术+情绪+风控报告）"
+    daily_limit: 50
+  
+  premium_report:
+    price: 0.20
+    description: "深度报告（含策略回测）"
+    daily_limit: 20
+
+## 限流配置
+
+rate_limit:
+  per_minute: 10      # 每分钟最多10次
+  per_hour: 200      # 每小时最多200次
+  per_day: 1000      # 每天最多1000次
+
+## 本地模式配置
+
+local_mode:
+  enabled: true       # 启用本地模式
+  skip_payment: false # 是否跳过支付（测试用）
+  mock_data: false    # 是否使用模拟数据
+```
+
+---
+
+## 环境变量配置
+
+如需通过环境变量配置，请创建 `.env` 文件：
+
+```bash
+# 支付宝配置
+ALIPAY_APP_ID=2021006149605908
+ALIPAY_PRIVATE_KEY=your_private_key_here
+
+# 支付开关
+PAYMENT_ENABLED=true
+PAYMENT_PRICE=0.05
+
+# 限流配置
+RATE_LIMIT_PER_MINUTE=10
+RATE_LIMIT_PER_HOUR=200
+
+# 本地模式
+LOCAL_MODE=true
+SKIP_PAYMENT=false
+```
+
+---
+
+## Secret配置
+
+应用私钥等敏感信息请从 `SECRET.md` 获取，不要硬编码在配置文件中。
+
+```bash
+# 从SECRET.md读取私钥
+source ./SECRET.md
+export ALIPAY_PRIVATE_KEY=$APP_PRIVATE_KEY
+```

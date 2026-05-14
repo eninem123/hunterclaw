@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "vibe-trading": {
+            "command": "/root/.openclaw/venv/vibe-trading/bin/vibe-trading-mcp",
+            "args": [],
+            "env": {
+                "TUSHARE_TOKEN": "cc40a0c34aaa1bf16562c6c02eab4545bf260bef9f080ded0b8b29c4"
+            }
+        }
+    }
+}

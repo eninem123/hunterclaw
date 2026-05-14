@@ -1,0 +1,27 @@
+{
+  "date": "2026-04-11",
+  "weekday": "星期五",
+  "market": {
+    "prediction": "",
+    "actual": {
+      "sh000001": { "close": 0, "pct": 0, "high": 0, "low": 0 },
+      "sz399001": { "close": 0, "pct": 0, "high": 0, "low": 0 },
+      "sz399006": { "close": 0, "pct": 0, "high": 0, "low": 0 }
+    },
+    "verdict": "",
+    "match": null
+  },
+  "warnings": [],
+  "warningsAccuracy": {
+    "total": 0,
+    "valid": 0,
+    "match": 0
+  },
+  "portfolio": {
+    "action": "",
+    "reason": "",
+    "result": ""
+  },
+  "summary": "",
+  "nextDayFocus": []
+}

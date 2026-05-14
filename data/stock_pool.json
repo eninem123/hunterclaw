@@ -1,0 +1,107 @@
+[
+  {
+    "code": "000001",
+    "name": "平安银行",
+    "market": "sz"
+  },
+  {
+    "code": "000002",
+    "name": "万  科Ａ",
+    "market": "sz"
+  },
+  {
+    "code": "000858",
+    "name": "五 粮 液",
+    "market": "sz"
+  },
+  {
+    "code": "000333",
+    "name": "美的集团",
+    "market": "sz"
+  },
+  {
+    "code": "000651",
+    "name": "格力电器",
+    "market": "sz"
+  },
+  {
+    "code": "002415",
+    "name": "海康威视",
+    "market": "sz"
+  },
+  {
+    "code": "002475",
+    "name": "立讯精密",
+    "market": "sz"
+  },
+  {
+    "code": "002594",
+    "name": "比亚迪",
+    "market": "sz"
+  },
+  {
+    "code": "300750",
+    "name": "宁德时代",
+    "market": "sz"
+  },
+  {
+    "code": "300059",
+    "name": "东方财富",
+    "market": "sz"
+  },
+  {
+    "code": "600519",
+    "name": "贵州茅台",
+    "market": "sh"
+  },
+  {
+    "code": "600036",
+    "name": "招商银行",
+    "market": "sh"
+  },
+  {
+    "code": "600276",
+    "name": "恒瑞医药",
+    "market": "sh"
+  },
+  {
+    "code": "600887",
+    "name": "伊利股份",
+    "market": "sh"
+  },
+  {
+    "code": "601318",
+    "name": "中国平安",
+    "market": "sh"
+  },
+  {
+    "code": "601398",
+    "name": "工商银行",
+    "market": "sh"
+  },
+  {
+    "code": "601857",
+    "name": "中国石油",
+    "market": "sh"
+  },
+  {
+    "code": "601888",
+    "name": "中国中免",
+    "market": "sh"
+  },
+  {
+    "code": "603288",
+    "name": "海天味业",
+    "market": "sh"
+  },
+  {
+    "code": "688981",
+    "name": "中芯国际",
+    "market": "sh"
+  },
+  {
+    "code": "002439",
+    "name": "启明星辰",
+    "market": "sz"
+  }
+]
