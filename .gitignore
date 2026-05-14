@@ -21,6 +21,10 @@ wheels/
 *.egg
 MANIFEST
 
+# Local secrets（勿提交）
+.env
+.env.*
+
 # IDE
 .vscode/
 .idea/
