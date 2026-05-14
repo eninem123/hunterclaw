@@ -2,6 +2,7 @@
 """
 进化交易系统 - 回测引擎
 """
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
@@ -100,9 +101,10 @@ class BacktestEngine:
         rs = gain / loss
         df['rsi'] = 100 - (100 / (1 + rs))
         
-        # 成交量均线
-        df['volume_ma'] = df['volume'].rolling(window=gene.volume_ma_period).mean()
-        df['volume_ratio'] = df['volume'] / df['volume_ma']
+        # 成交量均线（兼容 volume/vol 两种列名）
+        vol_col = 'volume' if 'volume' in df.columns else 'vol'
+        df['volume_ma'] = df[vol_col].rolling(window=gene.volume_ma_period).mean()
+        df['volume_ratio'] = df[vol_col] / df['volume_ma']
         
         # 价格趋势（简单斜率）
         df['trend'] = df['close'].rolling(window=5).apply(
@@ -144,9 +146,32 @@ class BacktestEngine:
         # 计算技术指标
         df = self.calculate_technical_indicators(df, gene)
         
+        # 确定日期列：优先用 trade_date 列，否则用索引（parquet 缓存格式）
+        has_trade_date = 'trade_date' in df.columns
+        has_date_index = isinstance(df.index, pd.DatetimeIndex)
+        
         # 逐日回测
         for i in range(len(df)):
-            date = df.index[i]
+            # 获取日期值
+            if has_trade_date:
+                date_val = df.iloc[i]['trade_date']
+            elif has_date_index:
+                date_val = df.index[i]
+            else:
+                date_val = i  # fallback to integer index
+            
+            # 转换为 datetime 用于日期计算
+            if isinstance(date_val, pd.Timestamp):
+                date = date_val
+            elif isinstance(date_val, str):
+                date = pd.to_datetime(date_val)
+            elif isinstance(date_val, (int, float)):
+                date = pd.to_datetime(str(int(date_val)), format='%Y%m%d')
+            elif isinstance(date_val, datetime):
+                date = pd.Timestamp(date_val)
+            else:
+                date = pd.Timestamp(date_val)
+            
             row = df.iloc[i]
             
             # 更新持仓市值
@@ -210,11 +235,29 @@ class BacktestEngine:
             self.equity_curve.append(total_value)
             self.dates.append(date)
         
-        # 回测结束，清空所有持仓
+        # 回测结束，清空所有持仓（复用上面的日期解析逻辑）
+        if has_trade_date:
+            last_date_val = df.iloc[-1]['trade_date']
+        elif has_date_index:
+            last_date_val = df.index[-1]
+        else:
+            last_date_val = len(df) - 1
+        
+        if isinstance(last_date_val, pd.Timestamp):
+            last_date = last_date_val
+        elif isinstance(last_date_val, str):
+            last_date = pd.to_datetime(last_date_val)
+        elif isinstance(last_date_val, (int, float)):
+            last_date = pd.to_datetime(str(int(last_date_val)), format='%Y%m%d')
+        elif isinstance(last_date_val, datetime):
+            last_date = pd.Timestamp(last_date_val)
+        else:
+            last_date = pd.Timestamp(last_date_val)
+        
         for pos_symbol in list(self.positions.keys()):
             if pos_symbol in self.positions:
                 last_price = df.iloc[-1]['close']
-                self._close_position(pos_symbol, df.index[-1], last_price, "回测结束")
+                self._close_position(pos_symbol, last_date, last_price, "回测结束")
         
         # 计算绩效指标
         metrics = self.calculate_metrics(df)
@@ -365,7 +408,20 @@ class BacktestRunner:
     
     def test_strategy(self, symbol, gene, days=60):
         """测试单个策略"""
-        # 获取数据
+        # 优先从 parquet 缓存加载数据，避免网络请求
+        cache_file = self.data_fetcher.quotes_dir / f"{symbol}.parquet"
+        if cache_file.exists() and cache_file.stat().st_size > 0:
+            try:
+                df = pd.read_parquet(cache_file)
+                # 取最近 N 个交易日
+                df = df.tail(days).copy()
+                if len(df) >= 30:
+                    metrics = self.backtest_engine.run(symbol, df, gene)
+                    return metrics
+            except Exception:
+                pass
+        
+        # 缓存无效时才走网络请求
         df = self.data_fetcher.get_daily_data(symbol, days)
         if df is None or len(df) < 30:
             return None
@@ -377,12 +433,32 @@ class BacktestRunner:
     
     def batch_test_strategies(self, symbols, genes):
         """批量测试策略"""
+        # 只测试有缓存数据的股票，跳过网络失败的
+        cached_symbols = []
+        for sym in symbols[:10]:
+            cache_file = self.data_fetcher.quotes_dir / f"{sym}.parquet"
+            if cache_file.exists() and cache_file.stat().st_size > 0:
+                try:
+                    df = pd.read_parquet(cache_file)
+                    if len(df) >= 30:
+                        cached_symbols.append(sym)
+                        continue
+                except Exception:
+                    pass
+            # 无缓存且网络失败，print一次警告（重试已在内）
+        
+        if cached_symbols:
+            print(f"  批量测试仅用 {len(cached_symbols)} 只有效缓存股票: {cached_symbols}")
+        else:
+            print("  警告: 无有效缓存股票，策略评估可能失败")
+            cached_symbols = symbols[:3]  # fallback to original list
+        
         results = []
         
         for gene in genes:
             # 在每个股票上测试策略
             strategy_results = []
-            for symbol in symbols[:10]:  # 先用前10只股票测试
+            for symbol in cached_symbols:
                 metrics = self.test_strategy(symbol, gene)
                 if metrics:
                     strategy_results.append(metrics)

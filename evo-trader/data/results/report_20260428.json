@@ -1,55 +1,55 @@
 {
   "date": "2026-04-28",
-  "time": "15:40:27",
-  "market_return": 0.043715846994535554,
+  "time": "15:40:23",
+  "market_return": 0.0,
   "total_strategies": 20,
   "best_strategy": {
-    "fitness": 412.50778444807685,
-    "returns": 54.67347853,
-    "sharpe": 7.495815279637691,
-    "max_drawdown": -0.0115267621041875,
-    "win_rate": 0.5062662337662338,
-    "trade_count": 10.8,
+    "fitness": 0.0,
+    "returns": 0.0,
+    "sharpe": 0.0,
+    "max_drawdown": 0.0,
+    "win_rate": 0.0,
+    "trade_count": 0,
     "gene_params": {
-      "ma_fast": 25,
-      "ma_slow": 25,
-      "ma_signal": 3,
-      "rsi_period": 18,
-      "rsi_overbought": 70,
-      "rsi_oversold": 17,
-      "volume_ma_period": 13,
-      "volume_multiplier": 1.2671806665183014,
-      "position_size": 0.43402014095019525,
-      "stop_loss_pct": 0.0371078884444526,
-      "take_profit_pct": 0.11635904938926231,
-      "max_hold_days": 4,
-      "weight_ma_cross": 0.4508567030386564,
-      "weight_rsi_signal": 0.0,
-      "weight_volume": 0.0,
-      "weight_trend": 0.5491432969613436
+      "ma_fast": 8,
+      "ma_slow": 55,
+      "ma_signal": 14,
+      "rsi_period": 16,
+      "rsi_overbought": 77,
+      "rsi_oversold": 24,
+      "volume_ma_period": 19,
+      "volume_multiplier": 1.2629409571939907,
+      "position_size": 0.4892407908871699,
+      "stop_loss_pct": 0.06540474309524166,
+      "take_profit_pct": 0.08360059293240243,
+      "max_hold_days": 19,
+      "weight_ma_cross": 0.37740606211445327,
+      "weight_rsi_signal": 0.09933186297424601,
+      "weight_volume": 0.13393993869222365,
+      "weight_trend": 0.38932213621907713
     }
   },
   "top_strategies": [
     {
       "rank": 1,
-      "fitness": 412.50778444807685,
-      "returns": 54.67347853,
-      "sharpe": 7.495815279637691,
-      "max_drawdown": -0.0115267621041875
+      "fitness": 0.0,
+      "returns": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0
     },
     {
       "rank": 2,
-      "fitness": 412.3971984750445,
-      "returns": 54.668621392,
-      "sharpe": 7.495498817740618,
-      "max_drawdown": -0.011663806014534981
+      "fitness": 0.0,
+      "returns": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0
     },
     {
       "rank": 3,
-      "fitness": 348.2990514425444,
-      "returns": 46.020757668,
-      "sharpe": 7.491918630109457,
-      "max_drawdown": -0.01128842846912481
+      "fitness": 0.0,
+      "returns": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0
     },
     {
       "rank": 4,

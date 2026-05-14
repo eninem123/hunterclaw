@@ -1,0 +1,41 @@
+{
+  "cash": 42977.0,
+  "positions": [
+    {
+      "code": "000977",
+      "name": "浪潮信息",
+      "shares": 100,
+      "entry_price": 72.8,
+      "cost": 7280.0,
+      "stop_loss": 65.0,
+      "take_profit_1": 80.08,
+      "take_profit_2": 86.0,
+      "buy_date": "2026-05-13",
+      "status": "holding",
+      "tag": "主线投资"
+    },
+    {
+      "code": "600362",
+      "name": "江西铜业",
+      "shares": 100,
+      "entry_price": 50.03,
+      "cost": 5003.0,
+      "stop_loss": 47.64,
+      "take_profit_1": 55.0,
+      "take_profit_2": 60.0,
+      "buy_date": "2026-05-13",
+      "status": "holding",
+      "tag": "观察候选"
+    }
+  ],
+  "total_value": 60260.0,
+  "last_trade_date": "2026-05-14",
+  "market_temperature": 80,
+  "volume_growth": 32.9,
+  "strategy_version": "v3.13",
+  "notes": "v3.13 R17温度同步 | 持仓.json→80℃(与trade_state一致) | 浪潮TP2@77.17已到建议卖1/3 | 江西铜业观察",
+  "history": [
+    {"date": "2026-05-13", "action": "BUY", "code": "600362", "name": "江西铜业", "price": 50.03, "shares": 100, "tag": "观察候选"},
+    {"date": "2026-05-14", "action": "UPDATE", "code": "ALL", "name": "系统", "price": 0, "shares": 0, "tag": "v3.13升级"}
+  ]
+}

@@ -279,7 +279,14 @@ class StrategyPool:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        self.pool_size = data['pool_size']
+        self.pool_size = data.get('pool_size', 20)
+        
+        # 处理旧格式（无strategies字段）或空文件
+        if 'strategies' not in data or not data['strategies']:
+            print(f"  策略池为空，生成随机策略...")
+            self.initialize_random()
+            return
+        
         self.strategies = []
         for s_data in data['strategies']:
             self.strategies.append({
@@ -326,3 +333,9 @@ if __name__ == "__main__":
     # 测试进化
     pool.evolve()
     print(f"进化后策略数: {len(pool.strategies)}")
+
+# 自动更新 2026-04-28
+# 来源: Hermes 复盘教训
+# 约束条件（基于历史教训）:
+# - 禁止追高入场：回撤 < -2% 时才允许买入
+# - 策略评估时惩罚追高信号
