@@ -1,40 +1,81 @@
-# TOOLS.md - Local Notes
+# TOOLS.md - 龙虾版工具与规则
 
-Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
+## 环境
+- 服务器: 101.32.218.156 (本机)
+- DeepSeek API Key: sk-99fbf83aa6704057b2eae88dba14e88b
+- 龙虾模型: deepseek-v4-pro
+- 爱马仕模型: deepseek-v4-flash
+- 爱马仕路径: /root/hermes-agent/
 
-## What Goes Here
+## 🔒 交易脚本（必须执行）
 
-Things like:
+### pre_flight_check.py - 操作前硬拦截
+- 路径: /root/.openclaw/workspace/猎手模拟交易/tools/pre_flight_check.py
+- 用法: python3 pre_flight_check.py <buy|sell> <股票代码> <数量> [当前价格]
+- 规则:
+  - 灯色<45禁止新仓，<60禁止补仓
+  - 距止损<3%禁止补仓
+  - 浮亏>-5%禁止补仓
+  - 不碰300/688，不追涨停
+  - 整手检查(100股整数倍)
+  - T+1检查
+- **返回FAIL=禁止操作，不给出买入建议**
 
-- Camera names and locations
-- SSH hosts and aliases
-- Preferred voices for TTS
-- Speaker/room names
-- Device nicknames
-- Anything environment-specific
+### market_scanner.py - 全市场扫描
+- 路径: /root/.openclaw/workspace/猎手模拟交易/tools/market_scanner.py
+- 用法: 先获取当日主力资金流入TOP数据，填入MARKET_DATA后运行
+- 规则:
+  - 资金流入≥3亿
+  - 排除300/688/ST/已持仓
+  - 1手金额≤可用资金10%
+  - **输出候选池≠买入建议**
 
-## Examples
+### atr_stop_calculator.py - ATR动态止损止盈
+- 路径: /root/.openclaw/workspace/猎手模拟交易/tools/atr_stop_calculator.py
+- 用法: python3 atr_stop_calculator.py --scan
+- 止损公式: 持仓期最高价 - K × ATR(14)
+- 止盈公式(Chandelier Exit): 最高价 - K_profit × ATR，只上移不下移
+- K值按持仓类型: 🔴短线1.5 | 🟣防御2.0 | 🟢长线3.0
+- **ATR止损优先于固定止损：ATR更紧时用ATR**
 
-```markdown
-### Cameras
+## 🔒 日常提示词触发铁律
+主人问今天能买吗/能开仓吗/有没有推荐的/止损止盈时：
+1. 必须先跑 pre_flight_check.py → FAIL则说不能买
+2. 必须再跑 market_scanner.py → 输出候选池
+3. 必须再跑 atr_stop_calculator.py --scan → 输出动态止损止盈位
+4. 禁止跳过脚本直接回答，跳过=失职
 
-- living-room → Main area, 180° wide angle
-- front-door → Entrance, motion-triggered
+## 🔒 安全铁律
+- 数据真实性：行情数据必须搜索验证，严禁编造
+- A股T+1：当天买的不能卖
+- A股交易单位：最小1手=100股
+- 交叉验证：至少2个独立源
+- 止损线v6.19: 宁沪11.00/国电4.51/特变24.80/中电信6.50
 
-### SSH
+## 🔒 猎手核心风控
+- 止损-5%，单日买入≤3次，单只≤30%
+- 买点：回踩低吸>突破企稳>追高
+- 卖点：强势+10%/普通+8%分批/弱势+5%
+- 标签：🟢主线/🟡观察/🔴短线(≤1/10)
 
-- home-server → 192.168.1.100, user: admin
+## 🔒 持仓分层止损
+- 🟢长线：止损-8~10%/破60日线/基本面坏，不止盈，≤20%仓
+- 🟣防御：止损-5~8%/破20日线，+8%分批止盈，≤15%仓
+- 🔴短线：止损-3~5%/破5日线，+5%即走，≤10%仓
 
-### TTS
+## 🔒 分批止盈铁律（5/20新增）
+- 禁止等完美价格全仓止盈
+- 到达止盈目标80%先卖1/3
+- 到达95%再卖1/3
+- 剩余用ATR跟踪止盈
+- 例子：目标14.20→12.80先卖1/3→13.20再卖1/3→剩余ATR跟踪
 
-- Preferred voice: "Nova" (warm, slightly British)
-- Default speaker: Kitchen HomePod
-```
+## 🔒 记忆同步铁律
+- 持仓/条件单变动→立刻更新SOUL.md
+- 回复涉及持仓数据前→先读SOUL.md确认
+- 关键信息矛盾→查原始记录不猜不编
 
-## Why Separate?
-
-Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
-
----
-
-Add whatever helps you do your job. This is your cheat sheet.
+## 🔒 选股推荐铁律
+- 扫描只出候选池不出行动建议
+- 详细分析跑完+给好入场区间后再通知主人
+- 推荐时必须同时给出入场价位和别追高警告

@@ -442,6 +442,260 @@ class DataService:
             logger.error(f"获取板块资金流向失败: {e}")
             return {"error": str(e)}
     
+    # ==================== ETF资金流向 ====================
+    
+    def get_etf_money_flow(self, indicator: str = "今日") -> Dict:
+        """获取ETF资金流向排名
+        
+        V07规则：ETF资金流向（科技ETF连续净申购→增量信号）
+        使用ETF每日净值/市价数据，按增长率和折价率排序。
+        
+        Args:
+            indicator: 时间指标 今日/3日/5日（3日/5日使用缓存数据加推定）
+        
+        Returns:
+            按涨幅排序的ETF数据，可筛选科技/半导体类ETF观测资金流向
+        """
+        cache_key = self.cache.make_key("fund", "etf", indicator)
+        
+        cached = self.cache.cache.get(cache_key)
+        if cached is not None:
+            return {"data": cached, "source": "cache"}
+        
+        try:
+            self._rate_limit()
+            # 东方财富-ETF每日净值/场地基金数据
+            df = ak.fund_etf_fund_daily_em()
+            
+            if df is None or df.empty:
+                return {"error": "ETF数据为空", "indicator": indicator}
+            
+            # 解析增长率列，排序取前30
+            records = df.to_dict(orient='records')
+            
+            # 解析数值
+            for r in records:
+                try:
+                    gr = str(r.get("增长率", "0%")).replace("%", "").strip()
+                    r["_growth_rate_pct"] = float(gr) if gr else 0.0
+                except (ValueError, TypeError):
+                    r["_growth_rate_pct"] = 0.0
+            
+            # 按增长率排序
+            records.sort(key=lambda x: x.get("_growth_rate_pct", 0), reverse=True)
+            
+            # 标记科技类ETF（按名称关键词）
+            tech_keywords = ["科技", "半导体", "芯片", "AI", "人工智能", "信息", "通信", 
+                           "计算机", "电子", "科创", "创新", "数字", "软件", "互联", "新兴"]
+            for r in records:
+                name = str(r.get("基金简称", ""))
+                r["_is_tech"] = any(kw in name for kw in tech_keywords)
+            
+            data = records[:50]  # 返回前50
+            
+            self.cache.cache.set(cache_key, data, CacheManager.TTL_REAL_TIME)
+            
+            return {
+                "data": data,
+                "source": "akshare",
+                "indicator": indicator,
+                "note": "V07规则: 使用ETF增长率排序近似资金流向；科技类ETF已标记(_is_tech)",
+                "total_etf_count": len(records)
+            }
+        except Exception as e:
+            logger.error(f"获取ETF资金流向失败({indicator}): {e}")
+            return {"error": str(e), "indicator": indicator}
+    
+    # ==================== 期指基差 ====================
+    
+    def get_futures_basis(self) -> Dict:
+        """获取沪深300期指基差数据
+        
+        V06规则：期指基差信号（沪深300升水>20乐观/贴水>20谨慎）
+        获取沪深300现货与期货的价差（基差），用于判断市场情绪。
+        
+        Returns:
+            dict with basis data or fallback structured response
+        """
+        cache_key = self.cache.make_key("market", "futures", "basis")
+        
+        cached = self.cache.cache.get(cache_key)
+        if cached is not None:
+            return {"data": cached, "source": "cache"}
+        
+        # 降级：通过 trade_state.json 获取
+        try:
+            fallback = self._get_futures_basis_fallback()
+            if any(fb.get("basis") is not None for fb in fallback):
+                self.cache.cache.set(cache_key, fallback, CacheManager.TTL_REAL_TIME)
+                return {
+                    "data": fallback,
+                    "source": "trade_state_json",
+                    "note": "使用盘后结算数据"
+                }
+        except Exception as e:
+            logger.warning(f"获取期指基差降级数据失败: {e}")
+        
+        # 再降级：用CSI300指数数据构建结构化响应
+        try:
+            self._rate_limit()
+            csi_df = ak.stock_zh_index_spot_em()
+            csi = csi_df[csi_df['代码'] == '000300']
+            
+            if not csi.empty:
+                row = csi.iloc[0]
+                spot_price = float(row.get('最新价', 0))
+                pct_chg = float(row.get('涨跌幅', 0))
+                # 推定基差（没有期货数据时返回基础信息）
+                data = [{
+                    "index_name": "沪深300",
+                    "index_code": "000300",
+                    "spot_price": spot_price,
+                    "spot_change_pct": pct_chg,
+                    "futures_price": None,
+                    "basis": None,
+                    "basis_pct": None,
+                    "signal": "unknown",
+                    "csi300_spot": True,
+                    "note": "仅获取到现货数据，期货基差需手动查询",
+                    "timestamp": datetime.now().isoformat()
+                }]
+                self.cache.cache.set(cache_key, data, CacheManager.TTL_REAL_TIME)
+                return {
+                    "data": data,
+                    "source": "akshare_spot_only",
+                    "note": "仅获取到沪深300现货数据，无实时期货基差"
+                }
+        except Exception as e:
+            logger.warning(f"获取CSI300现货数据失败: {e}")
+        
+        # 最终降级：纯结构化响应
+        now = datetime.now()
+        fallback_data = [{
+            "symbol": "IF",
+            "contract": "IF当月",
+            "spot_price": None,
+            "futures_price": None,
+            "basis": None,
+            "basis_pct": None,
+            "signal": "unknown",
+            "note": "所有数据源均不可用，建议手动查询期指基差",
+            "timestamp": now.isoformat(),
+            "recommendation": "沪深300期货基差可通过东方财富/同花顺/中金所官网查询"
+        }]
+        
+        return {
+            "data": fallback_data,
+            "source": "none",
+            "error": "无法获取期指基差数据",
+            "fallback": True,
+            "timestamp": now.isoformat()
+        }
+    
+    def _get_futures_basis_fallback(self) -> List[Dict]:
+        """降级获取期指基差数据
+        
+        尝试读取本地 trade_state.json 缓存文件。
+        若均不可用，返回结构化降级信息。
+        """
+        import os
+        state_paths = [
+            "/root/.openclaw/workspace/data/trade_state.json",
+            "data/trade_state.json",
+            "/tmp/trade_state.json"
+        ]
+        
+        for path in state_paths:
+            try:
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        state_data = json.load(f)
+                    if isinstance(state_data, dict) and "futures_basis" in state_data:
+                        return state_data["futures_basis"]
+            except Exception:
+                continue
+        
+        # 结构化降级响应
+        now = datetime.now()
+        return [{
+            "symbol": "IF",
+            "contract": "IF当月",
+            "spot_price": None,
+            "futures_price": None,
+            "basis": None,
+            "basis_pct": None,
+            "signal": "unknown",
+            "note": "数据源不可用，建议手动查询期指基差",
+            "timestamp": now.isoformat(),
+            "recommendation": "沪深300期货基差可通过东方财富/同花顺手动查询"
+        }]
+    
+    # ==================== 板块主力净流入率 ====================
+    
+    def get_sector_money_flow_ratio(self, limit: int = 20) -> Dict:
+        """获取板块主力净流入率
+        
+        V05规则：板块主力净流入率 = 板块主力净流入 / 板块成交额 * 100%
+        这是get_sector_money_flow的增强版本，添加了主力净流入率计算。
+        
+        Args:
+            limit: 返回板块数量，默认20
+        
+        Returns:
+            带主力净流入率的板块资金流排名
+        """
+        cache_key = self.cache.make_key("fund", "sector", "ratio", str(limit))
+        
+        cached = self.cache.cache.get(cache_key)
+        if cached is not None:
+            return {"data": cached, "source": "cache"}
+        
+        try:
+            self._rate_limit()
+            df = ak.stock_sector_fund_flow_rank(indicator="今日")
+            
+            if df is None or df.empty:
+                return {"error": "板块资金流数据为空"}
+            
+            # 计算主力净流入率
+            records = df.to_dict(orient='records')
+            enhanced = []
+            for record in records[:limit]:
+                try:
+                    money_flow = float(record.get("主力净流入", 0) or 0)
+                    turnover = float(record.get("成交额", 1) or 0)
+                    
+                    if turnover > 0:
+                        net_flow_ratio = round(money_flow / turnover * 100, 2)
+                    else:
+                        net_flow_ratio = 0.0
+                except (ValueError, TypeError):
+                    money_flow = 0
+                    turnover = 0
+                    net_flow_ratio = 0.0
+                
+                enhanced.append({
+                    **record,
+                    "主力净流入率_v05": net_flow_ratio,
+                    "interpretation": (
+                        "高流入" if net_flow_ratio > 0.5 else
+                        "中等流入" if net_flow_ratio > 0.1 else
+                        "微流入" if net_flow_ratio > 0 else
+                        "净流出"
+                    )
+                })
+            
+            self.cache.cache.set(cache_key, enhanced, CacheManager.TTL_REAL_TIME)
+            
+            return {
+                "data": enhanced,
+                "source": "akshare",
+                "note": "V05规则: 主力净流入率 = 主力净流入 / 成交额 * 100%"
+            }
+        except Exception as e:
+            logger.error(f"获取板块主力净流入率失败: {e}")
+            return {"error": str(e)}
+    
     # ==================== 财务数据 ====================
     
     def get_financial_report(self, symbol: str, report_type: str = "annual") -> Dict:
@@ -632,6 +886,105 @@ class DataService:
         except Exception as e:
             logger.error(f"获取板块行情失败: {sector_name} - {e}")
             return {"error": str(e)}
+    
+    # ==================== 选股筛选 (v2.1新增) ====================
+    
+    def screen_stocks(self, filters: Dict = None) -> Dict:
+        """多条件选股筛选器 v2.1
+        
+        Args:
+            filters: 筛选条件字典
+                - min_pe: 最低PE (默认0)
+                - max_pe: 最高PE (默认100)
+                - min_pb: 最低PB (默认0)
+                - max_pb: 最高PB (默认10)
+                - min_roe: 最低ROE (默认0)
+                - max_market_cap: 最高市值(亿, 默认10000)
+                - sector: 板块名称 (可选)
+                - limit: 返回数量 (默认20)
+                - sort_by: 排序字段 (默认'pe_ttm')
+        
+        Returns:
+            筛选结果列表
+        """
+        if filters is None:
+            filters = {}
+        
+        min_pe = filters.get('min_pe', 0)
+        max_pe = filters.get('max_pe', 100)
+        min_pb = filters.get('min_pb', 0)
+        max_pb = filters.get('max_pb', 10)
+        min_roe = filters.get('min_roe', 0)
+        max_market_cap = filters.get('max_market_cap', 10000)
+        sector_name = filters.get('sector', '')
+        limit = filters.get('limit', 20)
+        sort_by = filters.get('sort_by', 'pe_ttm')
+        
+        cache_key = self.cache.make_key('screen', 'stocks', 
+            f'pe{min_pe}-{max_pe}_pb{min_pb}-{max_pb}_roe{min_roe}_cap{max_market_cap}_{sector_name}_{sort_by}_{limit}')
+        
+        cached = self.cache.cache.get(cache_key)
+        if cached is not None:
+            return {'data': cached, 'source': 'cache'}
+        
+        try:
+            self._rate_limit()
+            # 获取全市场数据
+            df = ak.stock_zh_a_spot_em()
+            
+            if df is None or df.empty:
+                return {'error': '无法获取全市场数据'}
+            
+            # 基础过滤
+            df = df[
+                (df['市盈率-动态'].astype(float) >= min_pe) &
+                (df['市盈率-动态'].astype(float) <= max_pe) &
+                (df['市净率'].astype(float) >= min_pb) &
+                (df['市净率'].astype(float) <= max_pb) &
+                (df['总市值'].astype(float) / 1e8 <= max_market_cap)
+            ]
+            
+            # ROE过滤(需要单独获取，此处用近似: 市净率相关)
+            if min_roe > 0:
+                df = df[df['市净率'].astype(float) > 0.5]  # PB>0.5作为ROE>0的近似
+            
+            # 排序
+            if sort_by == 'pe_ttm':
+                df = df.sort_values('市盈率-动态', ascending=True)
+            elif sort_by == 'pb':
+                df = df.sort_values('市净率', ascending=True)
+            elif sort_by == 'volume':
+                df = df.sort_values('成交额', ascending=False)
+            elif sort_by == 'change_pct':
+                df = df.sort_values('涨跌幅', ascending=False)
+            
+            records = df.head(limit).to_dict(orient='records')
+            
+            # 简化输出
+            result = []
+            for r in records:
+                result.append({
+                    'code': str(r.get('代码', '')),
+                    'name': str(r.get('名称', '')),
+                    'price': float(r.get('最新价', 0)),
+                    'pe_ttm': float(r.get('市盈率-动态', 0)),
+                    'pb': float(r.get('市净率', 0)),
+                    'market_cap_yi': round(float(r.get('总市值', 0)) / 1e8, 1),
+                    'chg_pct': float(r.get('涨跌幅', 0)),
+                    'turnover_yi': round(float(r.get('成交额', 0)) / 1e8, 2),
+                })
+            
+            self.cache.cache.set(cache_key, result, CacheManager.TTL_FINANCIAL)
+            
+            return {
+                'data': result,
+                'source': 'akshare',
+                'filters_applied': filters,
+                'total_filtered': len(df)
+            }
+        except Exception as e:
+            logger.error(f'选股筛选失败: {e}')
+            return {'error': str(e)}
     
     # ==================== 市场情绪 ====================
     

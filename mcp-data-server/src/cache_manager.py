@@ -145,6 +145,8 @@ class CacheManager:
     
     def __init__(self):
         self.cache = MemoryCache()
+        self.redis_cache = None
+        self.redis_available = False
     
     @staticmethod
     def make_key(*parts) -> str:
@@ -202,6 +204,58 @@ class CacheManager:
     def delete(self, key: str) -> bool:
         """删除指定缓存键"""
         return self.cache.delete(key)
+    
+    def init_redis(self, redis_url: str = None) -> bool:
+        """尝试初始化Redis缓存层（可选）v2.1
+        Args:
+            redis_url: Redis连接URL, 默认从环境变量REDIS_URL读取
+        Returns:
+            bool: True if Redis connected, False otherwise
+        """
+        try:
+            import os
+            import redis as _redis
+            url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+            self.redis_cache = _redis.from_url(url, socket_timeout=2, 
+                                                socket_connect_timeout=2,
+                                                decode_responses=True)
+            self.redis_cache.ping()
+            self.redis_available = True
+            logger = __import__('logging').getLogger(__name__)
+            logger.info(f"Redis缓存连接成功: {url}")
+            return True
+        except Exception:
+            self.redis_cache = None
+            self.redis_available = False
+            return False
+    
+    def set(self, key: str, value: Any, ttl: int = 300) -> None:
+        """设置缓存值（双写：内存 + Redis）"""
+        self.cache.set(key, value, ttl)
+        if self.redis_available and self.redis_cache:
+            try:
+                import json as _json
+                self.redis_cache.setex(key, ttl, _json.dumps(value, ensure_ascii=False))
+            except Exception:
+                pass
+    
+    def get(self, key: str) -> Optional[Any]:
+        """获取缓存值（优先内存，fallback Redis）"""
+        val = self.cache.get(key)
+        if val is not None:
+            return val
+        if self.redis_available and self.redis_cache:
+            try:
+                raw = self.redis_cache.get(key)
+                if raw:
+                    import json as _json
+                    val = _json.loads(raw)
+                    # 回写到内存缓存
+                    self.cache.set(key, val, 300)
+                    return val
+            except Exception:
+                pass
+        return None
 
 
 # 全局缓存实例

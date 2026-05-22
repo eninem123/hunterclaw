@@ -1,4 +1,4 @@
-# Python
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -25,28 +25,152 @@ MANIFEST
 .env
 .env.*
 
-# IDE
+# ===== Node =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# ===== IDE =====
 .vscode/
 .idea/
 *.swp
 *.swo
+*.swn
+*~
 
-# Data files
+# ===== Data & Temp =====
 *.parquet
 *.db
 *.sqlite3
 *.pkl
 *.pickle
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-.DS_Store
+*.bak
+*.bak.*
 *.tmp
 *.temp
+.DS_Store
+*.tar.gz
+*.zip
 
-# evo-trader specific
-evo-trader/data/quotes/*.parquet
+# ===== Logs =====
+*.log
+logs/
+*/logs/
+
+# ===== workspace transient =====
+memory/
+memory/archive/
+.learnings/
+learnings/
+knowledge_base/
+pending-summaries/
+pending_confirm/
+reports/
+research/
+research-notes/
+reviews/
+ScreenShot/
+Hermes/
+lobster/
+.backup/
+.credentials/
+.clawhub/
+.dreams/
+
+# ===== shared/hermes =====
+shared/
+Hermes/
+
+# ===== docs generated =====
+docs/*.bak*
+docs/*.tmp
+
+# ===== evo-trader generated =====
+evo-trader/data/quotes/
+evo-trader/data/results/
 evo-trader/logs/
+evo-trader/self_evolution/*.md
+evo-trader/self_evolution/*.json
+
+# ===== 猎手模拟交易 generated =====
+猎手模拟交易/.clawhub/
+猎手模拟交易/.learnings/
+猎手模拟交易/.openclaw/
+猎手模拟交易/data/quotes/
+猎手模拟交易/data/results/
+猎手模拟交易/logs/
+
+# ===== mock server =====
+mcp-data-server/__pycache__/
+
+# ===== test / playground =====
+test/
+tests/
+test_*
+*.test.*
+*.spec.*
+
+# ===== Generated/temp data =====
+*.csv
+data/quotes/
+data/results/
+*/data/quotes/
+*/data/results/
+*results/*.json
+*results/*.csv
+*results/*.md
+
+# ===== Reports =====
+*_report_*.md
+*_report_*.json
+*report_*.md
+*evolution_report*.md
+*/self_evolution/*.md
+*/self_evolution/*.json
+
+# ===== 猎手模拟交易 specific =====
+猎手模拟交易/data/
+猎手模拟交易/logs/
+猎手模拟交易/.*
+猎手模拟交易/evo-trader/data/
+猎手模拟交易/evo-trader/logs/
+猎手模拟交易/evo-trader/self_evolution/*.md
+猎手模拟交易/evo-trader/self_evolution/*.json
+
+# ===== Skills submodules =====
+skills/*/scripts/__pycache__/
+skills/*/__pycache__/
+
+# ===== coze files =====
+coze_*.py
+
+# ===== Specific generated files =====
+morning_briefing_*.md
+night-scan-*.md
+research_notes.md
+*.lock
+bun.lock
+
+# ===== Trade state =====
+trade_state.json
+持仓.json
+Hermes持仓.json
+乐有家成交数据.json
+学位房成交数据.json
+
+# ===== Skill submodules generated =====
+*/skills/*/visuals/
+*/skills/*/screenshots/
+*/skills/*/templates/
+*/skills/*/references/
+*/skills/*/assets/
+*/skills/*/examples/
+
+# ===== Nested copies =====
+猎手模拟交易/猎手模拟交易/
+hunterclaw/
+
+# ===== 猎手模拟交易 skills =====
+猎手模拟交易/skills/

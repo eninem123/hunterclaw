@@ -7,6 +7,7 @@ import sys
 import json
 import logging
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
@@ -275,7 +276,7 @@ def create_mcp_tools():
     
     tools.append({
         "name": "get_north_money",
-        "description": "获取北向资金（沪深港通）流向数据，反映外资对A股的配置情况。",
+        "description": "获取北向资金（沪深港通）流向数据，反映外资对A股的配置情况。⚠️ 注意：2026-05-13起北向资金不再实时披露，改为T+1盘后数据",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -491,7 +492,24 @@ def create_mcp_tools():
     
     tools.append({
         "name": "get_market_sentiment",
-        "description": "获取综合市场情绪指标，包括涨跌家数、北向资金、恐慌贪婪指数等。",
+        "description": "获取综合市场情绪指标，包括涨跌家数、主力资金、恐慌贪婪指数等。⚠️ 注意：2026-05-13起北向资金不再实时披露，改为T+1盘后数据",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    })
+    
+    # ==================== 增强情绪工具 ====================
+    
+    def get_market_sentiment_enhanced() -> str:
+        """获取增强版市场情绪指标（委托模块级函数）"""
+        result = _get_market_sentiment_enhanced()
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    
+    tools.append({
+        "name": "get_market_sentiment_enhanced",
+        "description": "增强版市场情绪指标，聚合涨跌家数、板块资金流向、指数表现、北向资金等多源数据，返回综合情绪评分(0-100)。⚠️ 注意：2026-05-13起北向资金改为T+1盘后数据，北向数据为T+1盘后延迟",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -502,6 +520,79 @@ def create_mcp_tools():
     return tools
 
 
+def _get_market_sentiment_enhanced() -> dict:
+    """增强版市场情绪聚合函数（模块级，供tools和handlers共用）"""
+    from src.data_service import data_service
+    
+    try:
+        overview = data_service.get_market_overview()
+        overview_data = overview.get("data", {})
+        indices = data_service.get_index_quotes()
+        sector_flow = data_service.get_sector_money_flow()
+        sector_data = sector_flow.get("data", [])
+        north_money = data_service.get_north_money("daily")
+
+        score = 50
+        reasons = []
+
+        rising = overview_data.get("rising", 0)
+        falling = overview_data.get("falling", 0)
+        total = overview_data.get("total", 1)
+
+        if total > 0 and falling > 0:
+            ratio = rising / falling
+            if ratio > 2:
+                score += 20; reasons.append("涨跌比>2，市场强势")
+            elif ratio > 1.2:
+                score += 10; reasons.append("涨跌比>1.2，市场偏强")
+            elif ratio < 0.5:
+                score -= 20; reasons.append("涨跌比<0.5，市场弱势")
+            elif ratio < 0.8:
+                score -= 10; reasons.append("涨跌比<0.8，市场偏弱")
+
+        limit_up = overview_data.get("limit_up", 0)
+        if limit_up > 100:
+            score += 15; reasons.append(f"涨停{limit_up}家，情绪亢奋")
+        elif limit_up > 50:
+            score += 10; reasons.append(f"涨停{limit_up}家，情绪高涨")
+
+        top_sector = sector_data[0] if sector_data else {}
+        if top_sector:
+            reasons.append(f"资金流入最强板块: {top_sector.get('板块名称', 'N/A')}")
+
+        north_data = north_money.get("data", [])
+
+        sentiment_label = (
+            "极度恐慌" if score <= 20 else
+            "偏恐慌" if score <= 40 else
+            "中性" if score <= 60 else
+            "偏乐观" if score <= 80 else
+            "极度乐观"
+        )
+
+        return {
+            "market_sentiment_score": max(0, min(100, score)),
+            "sentiment_label": sentiment_label,
+            "reasons": reasons,
+            "overview": overview_data,
+            "indices": indices.get("data", []),
+            "sector_flow": sector_data[:5] if sector_data else [],
+            "north_money": north_data,
+            "north_money_note": "北向资金已改为T+1盘后数据，非实时",
+            "timestamp": datetime.now().isoformat(),
+            "source": "multi-source aggregated"
+        }
+    except Exception as e:
+        logger.error(f"增强情绪分析失败: {e}")
+        return {
+            "error": str(e),
+            "market_sentiment_score": 50,
+            "sentiment_label": "未知",
+            "fallback": "基础情绪获取失败，返回默认中性值",
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 def create_mcp_handlers():
     """创建MCP工具处理器"""
     from src.data_service import data_service
@@ -509,43 +600,93 @@ def create_mcp_handlers():
     handlers = {}
     
     # 实时行情
-    handlers["get_realtime_quote"] = lambda args: data_service.get_realtime_quote(args.get("symbol"))
-    handlers["get_realtime_quotes_batch"] = lambda args: data_service.get_realtime_quotes_batch(args.get("symbols", "").split(","))
+    handlers["get_realtime_quote"] = lambda args: data_service.get_realtime_quote(
+        args.get("symbol", "")
+    )
+    handlers["get_realtime_quotes_batch"] = lambda args: data_service.get_realtime_quotes_batch(
+        [s.strip() for s in args.get("symbols", "").split(",") if s.strip()]
+    )
     handlers["get_index_quotes"] = lambda args: data_service.get_index_quotes()
     handlers["get_market_overview"] = lambda args: data_service.get_market_overview()
     
     # K线
     handlers["get_daily_kline"] = lambda args: data_service.get_daily_kline(
-        args.get("symbol"), args.get("start_date"), args.get("end_date"), args.get("adjust", "qfq")
+        args.get("symbol", ""), args.get("start_date"), args.get("end_date"), args.get("adjust", "qfq")
     )
     handlers["get_weekly_kline"] = lambda args: data_service.get_weekly_kline(
-        args.get("symbol"), args.get("start_date"), args.get("end_date")
+        args.get("symbol", ""), args.get("start_date"), args.get("end_date")
     )
     handlers["get_minute_kline"] = lambda args: data_service.get_minute_kline(
-        args.get("symbol"), args.get("period", "5")
+        args.get("symbol", ""), args.get("period", "5")
     )
     
     # 资金
-    handlers["get_money_flow"] = lambda args: data_service.get_money_flow(args.get("symbol"))
-    handlers["get_north_money"] = lambda args: data_service.get_north_money(args.get("period", "daily"))
+    handlers["get_money_flow"] = lambda args: data_service.get_money_flow(args.get("symbol", ""))
+    handlers["get_north_money"] = lambda args: data_service.get_north_money(
+        args.get("period", "daily")
+    )
     handlers["get_sector_money_flow"] = lambda args: data_service.get_sector_money_flow()
     
     # 财务
     handlers["get_financial_report"] = lambda args: data_service.get_financial_report(
-        args.get("symbol"), args.get("report_type", "annual")
+        args.get("symbol", ""), args.get("report_type", "annual")
     )
-    handlers["get_roe_data"] = lambda args: data_service.get_roe_data(args.get("symbol"))
-    handlers["get_pe_pb"] = lambda args: data_service.get_pe_pb(args.get("symbol"))
+    handlers["get_roe_data"] = lambda args: data_service.get_roe_data(args.get("symbol", ""))
+    handlers["get_pe_pb"] = lambda args: data_service.get_pe_pb(args.get("symbol", ""))
     
     # 板块
-    handlers["get_sector_list"] = lambda args: data_service.get_sector_list(args.get("sector_type", "industry"))
-    handlers["get_hot_sectors"] = lambda args: data_service.get_hot_sectors(args.get("limit", 10))
-    handlers["get_sector_stocks"] = lambda args: data_service.get_sector_stocks(args.get("sector_name"))
+    handlers["get_sector_list"] = lambda args: data_service.get_sector_list(
+        args.get("sector_type", "industry")
+    )
+    handlers["get_hot_sectors"] = lambda args: data_service.get_hot_sectors(
+        args.get("limit", 10)
+    )
+    handlers["get_sector_stocks"] = lambda args: data_service.get_sector_stocks(
+        args.get("sector_name", "")
+    )
     
     # 情绪
     handlers["get_market_sentiment"] = lambda args: data_service.get_market_sentiment()
+    handlers["get_market_sentiment_enhanced"] = lambda args: _get_market_sentiment_enhanced()
     
     return handlers
+
+
+def _validate_tools_list(tools: list) -> bool:
+    """验证 tools/list 返回格式是否符合 MCP 规范"""
+    for t in tools:
+        if "name" not in t or "description" not in t or "inputSchema" not in t:
+            logger.warning(f"工具 {t.get('name', 'unknown')} 缺少必要字段")
+            return False
+        if not isinstance(t["inputSchema"], dict):
+            logger.warning(f"工具 {t['name']} 的 inputSchema 不是字典")
+            return False
+    return True
+
+
+def _safe_handler_call(handler, args: dict) -> dict:
+    """带降级逻辑的handler调用
+    
+    1. 正常调用
+    2. 失败后重试1次
+    3. 返回降级结果
+    """
+    try:
+        return handler(args)
+    except Exception as e:
+        logger.warning(f"handler调用失败(首次): {e}")
+        # 重试一次
+        try:
+            return handler(args)
+        except Exception as e2:
+            logger.error(f"handler调用失败(重试后): {e2}")
+            return {
+                "error": str(e2),
+                "error_type": type(e2).__name__,
+                "message": "服务临时不可用，请稍后重试",
+                "fallback": True,
+                "timestamp": datetime.now().isoformat()
+            }
 
 
 def run_stdio_server():
@@ -598,9 +739,22 @@ def run_stdio_server():
                 print(json.dumps(response))
                 
             elif request.get("method") == "tools/list":
+                # 验证 tools/list 返回格式
+                if not _validate_tools_list(tools):
+                    logger.warning("tools/list 返回格式不完整，已修复")
+                
+                # 确保每个工具都有正确的 inputSchema
+                validated_tools = []
+                for t in tools:
+                    validated_tools.append({
+                        "name": t["name"],
+                        "description": t["description"],
+                        "inputSchema": t.get("inputSchema", {"type": "object", "properties": {}, "required": []})
+                    })
+                
                 response = {
                     "jsonrpc": "2.0",
-                    "result": {"tools": tools},
+                    "result": {"tools": validated_tools},
                     "id": request.get("id")
                 }
                 print(json.dumps(response))
@@ -610,26 +764,19 @@ def run_stdio_server():
                 tool_args = request.get("params", {}).get("arguments", {})
                 
                 if tool_name in handlers:
-                    try:
-                        result = handlers[tool_name](tool_args)
-                        response = {
-                            "jsonrpc": "2.0",
-                            "result": {
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": json.dumps(result, ensure_ascii=False)
-                                    }
-                                ]
-                            },
-                            "id": request.get("id")
-                        }
-                    except Exception as e:
-                        response = {
-                            "jsonrpc": "2.0",
-                            "error": {"code": -32603, "message": str(e)},
-                            "id": request.get("id")
-                        }
+                    result = _safe_handler_call(handlers[tool_name], tool_args)
+                    response = {
+                        "jsonrpc": "2.0",
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": json.dumps(result, ensure_ascii=False)
+                                }
+                            ]
+                        },
+                        "id": request.get("id")
+                    }
                 else:
                     response = {
                         "jsonrpc": "2.0",

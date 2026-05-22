@@ -1,4 +1,6 @@
 {
+    "version": "2.1.0",
+    "description": "猎手系统 MCP 工具配置 (凌晨优化版 2026-05-21)",
     "mcpServers": {
         "vibe-trading": {
             "command": "/root/.openclaw/venv/vibe-trading/bin/vibe-trading-mcp",
@@ -6,6 +8,70 @@
             "env": {
                 "TUSHARE_TOKEN": "cc40a0c34aaa1bf16562c6c02eab4545bf260bef9f080ded0b8b29c4"
             }
+        },
+        "mcp-data-server": {
+            "command": "python3",
+            "args": ["-m", "mcp_data_server.main"],
+            "cwd": "/root/.openclaw/workspace/mcp-data-server/src",
+            "env": {
+                "PYTHONPATH": "/root/.openclaw/workspace/mcp-data-server/src"
+            }
         }
+    },
+    "tools": {
+        "vibe-trading": {
+            "list_skills": "列出71个金融技能",
+            "load_skill": "加载指定技能文档",
+            "get_market_data": "获取OHLCV数据",
+            "backtest": "回测策略",
+            "factor_analysis": "因子IC/IR分析",
+            "pattern_recognition": "图表形态识别",
+            "analyze_options": "Black-Scholes期权定价",
+            "analyze_trade_journal": "交易日志分析",
+            "extract_shadow_strategy": "影子策略提取",
+            "scan_shadow_signals": "扫描影子策略信号",
+            "run_swarm": "多Agent群组任务"
+        },
+        "mcp-data-server": {
+            "get_realtime_quote": "单股实时行情",
+            "get_realtime_quotes_batch": "批量实时行情",
+            "get_index_quotes": "主要指数行情",
+            "get_market_overview": "市场全景(涨跌停统计)",
+            "get_daily_kline": "日K线(支持前/后复权+降级)",
+            "get_weekly_kline": "周K线",
+            "get_minute_kline": "分钟K线",
+            "get_money_flow": "个股资金流向",
+            "get_north_money": "北向资金(T+1)",
+            "get_sector_money_flow": "板块资金流向",
+            "get_sector_money_flow_ratio": "板块主力净流入率(V05规则)",
+            "get_etf_money_flow": "ETF资金流向(V07规则)",
+            "get_futures_basis": "期指基差(V06规则)",
+            "get_financial_report": "财务报表",
+            "get_roe_data": "ROE数据",
+            "get_pe_pb": "PE/PB估值",
+            "get_sector_list": "板块列表",
+            "get_hot_sectors": "热门板块",
+            "get_sector_stocks": "板块成分股",
+            "get_sector_quotes": "板块行情",
+            "get_market_sentiment": "市场情绪(恐慌贪婪+涨跌比+北向)"
+        }
+    },
+    "rules_integration": {
+        "V05": "板块主力净流入率 (sector_money_flow_ratio)",
+        "V06": "期指基差信号 (futures_basis)",
+        "V07": "ETF资金流向 (etf_money_flow)",
+        "R18": "恐慌<25禁入 (market_sentiment.fear_greed)",
+        "R23-E": "假回暖检测 (需data_analyzer_v2+vibe-trading配合)"
+    },
+    "health_check": {
+        "interval_seconds": 300,
+        "services": ["vibe-trading", "mcp-data-server"],
+        "alert_on_failure": true
+    },
+    "cache_config": {
+        "realtime_ttl_seconds": 30,
+        "kline_daily_ttl_seconds": 3600,
+        "kline_minute_ttl_seconds": 60,
+        "financial_ttl_seconds": 86400
     }
 }

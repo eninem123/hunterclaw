@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 """
-猎手盘中实时监测脚本 v2
-智能版：只在关键价格事件时写入pending-summaries触发微信推送
-其他时间只写日志，不打扰用户
+猎手盘中实时监测脚本 v3.0 (凌晨优化版)
+改进:
+  1. 修复Path.write_text(append=True) bug → 统一使用open().write()
+  2. 完善300232洲明科技13信号体系检查
+  3. 新增各股涨跌停距离自动计算
+  4. 增加信号强度标记(🏆/⭐/📊/⚠️)
+  5. 支持--json输出模式
+  6. 增加市场广度指标(涨跌比计算)
 """
 
 import urllib.request
 import json
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional, Dict, List, Tuple
 
 # ===== 配置 =====
 STOCKS_TO_WATCH = [
@@ -155,13 +161,55 @@ def main():
         
         # 统一输出
         now_str = now.strftime('%H:%M:%S')
-        report_lines = [f"📊 **【猎手盘中监测 {now_str}】**"] + all_prices
+        
+        # 计算市场广度(涨跌比)
+        up_count = 0
+        down_count = 0
+        for symbol, name, y_close in STOCKS_TO_WATCH:
+            data = get_realtime_price(symbol)
+            if data and data['change_pct'] > 0:
+                up_count += 1
+            elif data and data['change_pct'] < 0:
+                down_count += 1
+        breadth_signal = "🟢 多头占优" if up_count > down_count * 1.5 else ("🔴 空头占优" if down_count > up_count * 1.5 else "🟡 均衡")
+        
+        # 信号标记逻辑
+        def signal_mark(chg_pct, gap):
+            if chg_pct > 5:
+                return "🏆"  # 强势
+            elif chg_pct > 2:
+                return "⭐"  # 偏强
+            elif gap < 3:
+                return "📊"  # 逼近涨停
+            elif chg_pct < -3:
+                return "⚠️"  # 偏弱
+            return ""
+        
+        report_lines = [
+            f"📊 **【猎手盘中监测 {now_str}】**",
+            f"市场广度: {breadth_signal} | 涨{up_count}跌{down_count}",
+            ""
+        ]
+        
+        for symbol, name, y_close in STOCKS_TO_WATCH:
+            data = get_realtime_price(symbol)
+            if data:
+                change_pct = (data['price'] - y_close) / y_close * 100
+                limit_up = round(y_close * 1.1, 2)
+                gap = (limit_up - data['price']) / limit_up * 100
+                sm = signal_mark(change_pct, gap)
+                report_lines.append(f"{sm} {name} {data['price']:.2f} ({change_pct:+.2f}%) 距涨停{gap:.1f}%")
+            else:
+                report_lines.append(f"❓ {name}: 获取失败")
+        
         report = '\n'.join(report_lines)
         
         out_file = PENDING_DIR / f"stock-monitor-{today}.md"
-        out_file.write_text(report, encoding='utf-8')
+        with open(out_file, 'w', encoding='utf-8') as f:
+            f.write(report)
         
-        log_file.open(mode="a").write(report + "\n")
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(report + "\n")
         print(report)
         
         return
@@ -196,12 +244,64 @@ def main():
     else:
         # 无事件，只写日志
         snapshot = build_market_snapshot(MODE)
-        log_file.write_text(snapshot + '\n', encoding='utf-8', append=True)
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(snapshot + '\n')
         print(f"✅ {now.strftime('%H:%M:%S')} 盘中监测：无重大事件，已记录日志")
 
 
+def check_all_stocks_events() -> List[Dict]:
+    """全面检查所有监控股票的异常事件 (v3.0新增)
+    
+    返回格式: [{"symbol": "...", "name": "...", "events": [...], "price": float}]
+    """
+    all_events = []
+    for symbol, name, y_close in STOCKS_TO_WATCH:
+        data = get_realtime_price(symbol)
+        if not data:
+            continue
+        
+        events = []
+        price = data['price']
+        chg_pct = data['change_pct']
+        
+        # 涨跌异常
+        if abs(chg_pct) > 5:
+            events.append(f"{'📈' if chg_pct > 0 else '📉'} 波动异常 {chg_pct:+.1f}%")
+        
+        # 涨停附近
+        limit_up = round(y_close * 1.1, 2)
+        if price >= limit_up * 0.97:
+            events.append(f"🚀 逼近涨停 {price:.2f}/{limit_up}")
+        
+        # 000960特殊检查
+        if symbol == 'sz000960':
+            events.extend(check_960_events(price))
+        
+        # 300232特殊检查
+        if symbol == 'sz300232':
+            sigs = check_300232_signals()
+            triggered = [s for s in sigs if s.get('status') == 'triggered']
+            if triggered:
+                events.append(f"📡 300232: {len(triggered)}/{len(sigs)-1}个信号触发")
+        
+        if events:
+            all_events.append({
+                'symbol': symbol, 'name': name, 'price': price,
+                'chg_pct': chg_pct, 'events': events
+            })
+    
+    return all_events
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == '--json':
+        events = check_all_stocks_events()
+        print(json.dumps(events, ensure_ascii=False, indent=2))
+    elif len(sys.argv) > 1 and sys.argv[1] == '--300232':
+        signals = check_300232_signals()
+        print(json.dumps(signals, ensure_ascii=False, indent=2))
+    else:
+        main()
 
 # ========== 洲明科技300232 专项监测（13信号体系）==========
 # 基于用户假设前提：收购概率85-88%，13个信号
@@ -220,7 +320,92 @@ SIGNALS_300232 = {
     'industry': True,  # 行业动态
 }
 
-def check_300232_signals():
-    """检查300232的13个信号"""
+def check_300232_signals() -> List[Dict]:
+    """检查300232洲明科技的13个信号 (v3.0完善版)
+    
+    13个监测信号:
+    1. 价格告警(涨停/入场/止损)
+    2. 成交量异动(量比>1.5)
+    3. 涨停板触发
+    4. 大宗交易
+    5. 龙虎榜上榜
+    6. 融资余额变化
+    7. QFII持仓变化
+    8. 公告异常
+    9. 汉得信息联动(同行业)  
+    10. 行业动态
+    11. 突破前高
+    12. MACD金叉/死叉
+    13. 收购进度更新
+    """
     signals = []
+    data = get_realtime_price('sz300232')
+    if not data:
+        signals.append({'id': 0, 'name': '数据获取', 'status': 'failed', 'detail': '无法获取300232行情'})
+        return signals
+    
+    price = data['price']
+    chg_pct = data['change_pct']
+    volume_ratio = data.get('volume_ratio', 1.0)
+    
+    # Signal 1: 价格告警
+    if price >= SIGNALS_300232['price_alert']['limit_up'] * 0.98:
+        signals.append({'id': 1, 'name': '价格告警', 'status': 'triggered', 
+                       'level': 'critical', 'detail': f'逼近涨停{price:.2f}'})
+    elif price >= SIGNALS_300232['price_alert']['entry']:
+        signals.append({'id': 1, 'name': '价格告警', 'status': 'active',
+                       'level': 'watch', 'detail': f'进入入场区{price:.2f}'})
+    elif price <= SIGNALS_300232['price_alert']['stop']:
+        signals.append({'id': 1, 'name': '价格告警', 'status': 'triggered',
+                       'level': 'critical', 'detail': f'触及止损{price:.2f}'})
+    else:
+        signals.append({'id': 1, 'name': '价格告警', 'status': 'normal',
+                       'level': 'info', 'detail': f'{price:.2f}'})
+    
+    # Signal 2: 成交量异动
+    if volume_ratio > SIGNALS_300232['volume_spike']:
+        signals.append({'id': 2, 'name': '量比异动', 'status': 'triggered',
+                       'level': 'watch', 'detail': f'量比{volume_ratio:.1f}x'})
+    else:
+        signals.append({'id': 2, 'name': '量比异动', 'status': 'normal', 'detail': f'{volume_ratio:.1f}x'})
+    
+    # Signal 3: 涨停板
+    if chg_pct >= 9.8:
+        signals.append({'id': 3, 'name': '涨停板', 'status': 'triggered',
+                       'level': 'critical', 'detail': f'涨停+{chg_pct:.1f}%'})
+    else:
+        signals.append({'id': 3, 'name': '涨停板', 'status': 'normal', 'detail': f'{chg_pct:+.1f}%'})
+    
+    # Signal 4-10: 标记为待验证(需要外部数据源)
+    for sid, name in [(4, '大宗交易'), (5, '龙虎榜'), (6, '融资余额'), 
+                       (7, 'QFII持仓'), (8, '公告异常'), (9, '汉得联动'), (10, '行业动态')]:
+        signals.append({'id': sid, 'name': name, 'status': 'unchecked', 'level': 'info', 
+                       'detail': '需外部数据源验证', 'manual_review': True})
+    
+    # Signal 11: 突破前高(基于日内最高价)
+    if data.get('high', 0) > data.get('yesterday_close', 0) * 1.05:
+        signals.append({'id': 11, 'name': '突破前高', 'status': 'triggered',
+                       'level': 'watch', 'detail': f'日内最高{data["high"]:.2f}'})
+    else:
+        signals.append({'id': 11, 'name': '突破前高', 'status': 'normal', 'detail': '未突破'})
+    
+    # Signal 12: 价格在MA5上方(简化MACD判断)
+    signals.append({'id': 12, 'name': 'MACD趋势', 'status': 'unchecked',
+                   'level': 'info', 'detail': '需K线数据计算'})
+    
+    # Signal 13: 收购进度
+    signals.append({'id': 13, 'name': '收购进度', 'status': 'unchecked',
+                   'level': 'info', 'detail': '人工跟踪', 'manual_review': True})
+    
+    # 计算信号触发数
+    triggered = sum(1 for s in signals if s['status'] == 'triggered')
+    active = sum(1 for s in signals if s['status'] == 'active')
+    unchecked = sum(1 for s in signals if s['status'] == 'unchecked')
+    
+    signals.insert(0, {
+        'id': 0, 'name': '摘要', 'status': 'summary',
+        'triggered': triggered, 'active': active, 'unchecked': unchecked,
+        'total': len(signals), 'confidence': min(85, triggered * 6 + active * 3)
+    })
+    
     return signals

@@ -24,6 +24,9 @@ import re
 import requests
 import logging
 import time
+import socket
+import ssl
+import hashlib
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -224,20 +227,28 @@ def get_position_prices(codes: Dict[str, str], config: HunterConfig) -> Dict[str
     prices = {}
     
     def fetch_price(name: str, code: str) -> Tuple[str, Optional[Dict]]:
-        """获取单个股票价格"""
+        """获取单个股票价格 (v2.1优化: 增强解析鲁棒性)"""
         try:
             url = f'https://qt.gtimg.cn/q={code}'
-            raw = http_get_with_retry(url, 'gbk', config)
+            raw = http_get_with_retry(url, 'gbk', config, cache_ttl=30)
             if not raw:
                 return name, None
             
-            m = re.search(r'v_\w+="(.+)"', raw)
+            m = re.search(r'v_(\w+)="(.+)"', raw)
             if m:
-                p = m.group(1).split('~')
-                if len(p) >= 32:
+                p = m.group(2).split('~')
+                if len(p) >= 38:
                     return name, {
                         'price': float(p[3]),
-                        'chg': float(p[32])
+                        'chg': float(p[32]),
+                        'volume': float(p[6]) if p[6] else 0,
+                        'turnover': float(p[37]) if p[37] else 0,
+                    }
+                elif len(p) >= 32:
+                    return name, {
+                        'price': float(p[3]),
+                        'chg': float(p[32]),
+                        'volume': float(p[6]) if p[6] else 0
                     }
         except Exception as e:
             logger.warning(f"获取{name}价格失败: {e}")
@@ -334,15 +345,53 @@ def step2_analyze(data: Dict, config: HunterConfig) -> Dict:
     temperature = int(50 + avg_chg * 10)
     temperature = max(0, min(100, temperature))
     
+    # 计算恐慌指数（基于跌幅和广度，模拟market_scanner逻辑）
+    panic_index = 60  # 中性
+    if avg_chg < -1:
+        panic_index -= 15
+    elif avg_chg < -0.5:
+        panic_index -= 5
+    elif avg_chg > 0.5:
+        panic_index += 5
+    elif avg_chg > 1:
+        panic_index += 10
+    panic_index = max(0, min(100, panic_index))
+    
+    # R22回暖预案状态
+    r22_active = panic_index < 25 and temperature < 35
+    
+    # R23假回暖标记 (v4.2.1: 阈值下调)
+    r23_warning = panic_index < 25 and 0.3 < avg_chg < 1.5  # 温和上涨中的冰点假回暖可能
+    
+    # v4.2.1: 三期止损梯队计算
+    stop_loss_tier = get_stop_loss_tiers(panic_index)
+    
+    # v4.2.1: 拐点参数集
+    inflection_params = get_inflection_params()
+    
     analysis = {
         'sentiment': sentiment,
         'index_avg_chg': round(avg_chg, 2),
         'indices': {k: round(v['chg'], 2) for k, v in indices.items()},
         'market_regime': market_regime,
-        'temperature': temperature
+        'temperature': temperature,
+        'panic_index': panic_index,
+        'r22_recovery_plan_ready': r22_active,
+        'r23_false_recovery_warning': r23_warning,
+        # v4.2.1 新增字段
+        'stop_loss_tier': stop_loss_tier,
+        'inflection_params': inflection_params,
+        'k_param_set_version': 'K-0520-1',
+        'v421_daily_version': '2026-05-19',
     }
     
-    logger.info(f"市场分析: 情绪={sentiment}, 温度={temperature}℃, 状态={market_regime}")
+    logger.info(f"市场分析: 情绪={sentiment}, 温度={temperature}℃, 状态={market_regime}, 恐慌={panic_index}")
+    logger.info(f"  v4.2.1止损梯队: {stop_loss_tier['tier']}-{stop_loss_tier['scenario']}")
+    logger.info(f"  v4.2.1拐点参数集: K-0520-1 ({inflection_params['scenario']})")
+    if r22_active:
+        logger.info(f"  🏥 R22回暖预案已准备 (恐慌{panic_index}<25，温度{temperature}℃)")
+    if r23_warning:
+        logger.info(f"  ⚠️ R23注意：冰点期温和上涨，防范假回暖一日游")
     return analysis
 
 
@@ -675,6 +724,181 @@ def run_closed_loop(config: HunterConfig = None) -> Dict:
     finally:
         # 清理缓存
         _cache.clear()
+
+
+# ══════════════════════════════════════════════════════════
+# v4.2.1 新增：纪律评分 + 拐点参数集 (K-0520-1)
+# ══════════════════════════════════════════════════════════
+
+def calculate_discipline_score_v421(trade_log: list) -> dict:
+    """计算交易纪律评分 v4.2.1
+    
+    4个维度:
+    1. R18冰点禁入(40%权重): 冰点期违规买入比例
+    2. 信号执行(30%权重): 非信号交易比例
+    3. R09-v2仓位上限(15%权重): 超仓位上限比例
+    4. R05单日≤2次(15%权重): 超2次交易日数
+    
+    Returns:
+        {
+            "total_score": float(0-100),
+            "items": [...],
+            "score_label": str,
+            "version": "v4.2.1"
+        }
+    """
+    if not trade_log or not isinstance(trade_log, list):
+        return {
+            "total_score": 100.0,
+            "items": [],
+            "valid_trades": 0,
+            "violations": 0,
+            "score_label": "\U0001f3c6 完美(无交易)",
+            "version": "v4.2.1"
+        }
+    
+    items = []
+    
+    # 1. R18: 冰点期违规
+    r18_violations = sum(1 for t in trade_log if t.get("panic_index", 50) < 35 and t.get("direction", "") in ("买入", "buy"))
+    r18_total = sum(1 for t in trade_log if t.get("panic_index", 50) < 50)
+    r18_score = 100.0 if r18_total == 0 else max(0.0, 100.0 - (r18_violations / r18_total * 100))
+    items.append({"rule": "R18冰点禁入", "weight": 0.40, "score": r18_score, "detail": f"冰点期违规买入{r18_violations}/{r18_total}次"})
+    
+    # 2. 信号执行
+    not_signal = sum(1 for t in trade_log if not t.get("is_signal_based", True))
+    signal_score = 100.0 if not_signal == 0 else max(0.0, 100.0 - (not_signal / len(trade_log) * 100))
+    items.append({"rule": "信号执行", "weight": 0.30, "score": signal_score, "detail": f"非信号交易{not_signal}/{len(trade_log)}笔"})
+    
+    # 3. R09-v2仓位
+    over_pos = sum(1 for t in trade_log if t.get("position_pct", 0) > t.get("max_allowed_pct", 100))
+    pos_score = 100.0 if over_pos == 0 else max(0.0, 100.0 - (over_pos / len(trade_log) * 100))
+    items.append({"rule": "R09-v2仓位上限", "weight": 0.15, "score": pos_score, "detail": f"超仓位{over_pos}/{len(trade_log)}笔"})
+    
+    # 4. R05单日≤2次
+    from collections import Counter
+    daily_counts = Counter(t.get("date", "") for t in trade_log)
+    exceed_days = sum(1 for c in daily_counts.values() if c > 2)
+    r05_score = max(0.0, 100.0 - exceed_days * 25)
+    items.append({"rule": "R05单日≤2次", "weight": 0.15, "score": r05_score, "detail": f"超2次天数: {exceed_days}"})
+    
+    total_score = sum(item["score"] * item["weight"] for item in items)
+    
+    if total_score >= 90:
+        label = "\U0001f3c6 优秀"
+    elif total_score >= 80:
+        label = "\u2705 良好"
+    elif total_score >= 60:
+        label = "\u26a0\ufe0f 及格"
+    else:
+        label = "\u274c 不及格"
+    
+    return {
+        "total_score": round(total_score, 1),
+        "items": items,
+        "valid_trades": sum(1 for t in trade_log if t.get("pnl_pct", -1) >= 0),
+        "violations": sum(1 for i in items if i["score"] < 60),
+        "score_label": label,
+        "version": "v4.2.1"
+    }
+
+
+def get_inflection_params(phase: str = "initial") -> dict:
+    """获取拐点专用参数集 K-0520-1
+    
+    Args:
+        phase: "initial"(回暖首次验证) | "confirm"(验证通过) | "stable"(稳定期)
+    
+    Returns:
+        拐点参数配置dict
+    """
+    params = {
+        "version": "K-0520-1",
+        "updated": "2026-05-19",
+        "scenario": phase,
+        "entry_cadence": [
+            {"D+0": "回暖确认日: 仅确认信号不交易"},
+            {"D+1": "验证日: 恐慌>25+连续2日, 买入10%(¥7,400)"},
+            {"D+2": "验证通过: 恐慌>25+上证收涨, 买入15%(¥11,100)"},
+            {"D+3": "稳定: 恐慌>35, 买入20-25%"}
+        ]
+    }
+    
+    if phase == "initial":
+        params.update({
+            "panic_entry": ">25 (连续2日)",
+            "max_position_pct": 10,
+            "max_single_pct": 5,
+            "stop_loss_pct": -2.5,
+            "take_profit_triggers": [3, 5, 8],
+            "take_profit_ratios": [30, 50, 100],
+            "max_hold_days": 3,
+            "allowed_types": "\u9632\u5fa1\u578b(\u94f6\u884c/\u516c\u7528/\u6d88\u8d39\u9f99\u5934)",
+            "conditions": "\u6050\u614c\u8fde\u7eed2\u65e5>25 + \u4e0a\u8bc1\u6536\u6da8 + \u6da8\u8dcc\u6bd4>1:1"
+        })
+    elif phase == "confirm":
+        params.update({
+            "panic_entry": ">25 \u786e\u8ba4",
+            "max_position_pct": 15,
+            "max_single_pct": 10,
+            "stop_loss_pct": -2.5,
+            "take_profit_triggers": [3, 5, 8],
+            "take_profit_ratios": [30, 50, 100],
+            "max_hold_days": 3,
+            "allowed_types": "\u9632\u5fa1\u578b+\u5e95\u90e8\u53cd\u5f39\u9996\u5148\u7528"
+        })
+    elif phase == "stable":
+        params.update({
+            "panic_entry": ">35",
+            "max_position_pct": 25,
+            "max_single_pct": 15,
+            "stop_loss_pct": -3.0,
+            "take_profit_triggers": [5, 8, 12],
+            "take_profit_ratios": [33, 33, 34],
+            "max_hold_days": 5,
+            "allowed_types": "\u5e38\u89c4(\u9664AI/\u534a\u5bfc\u4f53)"
+        })
+    
+    return params
+
+
+def get_stop_loss_tiers(panic_index: float) -> dict:
+    """三期止损梯队 v4.2.1
+    
+    覆盖3种场景:
+    - A: 恐慌<25 (空仓维持, 无需止损)
+    - B: 恐慌25-35 (回调初期, 收紧止损)
+    - C: 恐慌>35 (恢复正常止损)
+    """
+    if panic_index < 25:
+        return {
+            "tier": "A",
+            "scenario": "恐慌仍<25",
+            "probability": 0.85,
+            "action": "\u7a7a\u4ed3\u7ef4\u6301(\u65e0\u9700\u8bbe\u6b62\u635f)",
+            "hunter_action": "\u7a7a\u4ed3\u7b49\u5f85\u56de\u6696",
+            "kouzi_action": "\u539f\u59cb\u6b62\u635f\u4e0d\u53d8(-8%~-10%)"
+        }
+    elif panic_index < 35:
+        return {
+            "tier": "B",
+            "scenario": "\u6050\u614c\u56de\u534725-35",
+            "probability": 0.12,
+            "action": "\u8f7b\u4ed3\u8bd5\u63a215%",
+            "hunter_action": "\u5355\u53ea6\u6b62\u635f-2.5%, \u5355\u53ea\u6b62\u76c8+3%/+5%/+8% \u5206\u6279, \u6700\u5927\u6301\u4ed32\u53ea",
+            "max_position_pct": 15,
+            "stop_loss_pct": -2.5
+        }
+    else:
+        return {
+            "tier": "C",
+            "scenario": "\u6050\u614c\u56de\u5347>35",
+            "probability": 0.03,
+            "action": "\u8c28\u614e\u53c2\u4e0e25%",
+            "hunter_action": "\u6062\u590d-3.0%\u6807\u51c6\u6b62\u635f, +5%/+8%/+12% \u5206\u6279\u6b62\u76c8, \u6700\u59273\u53ea",
+            "max_position_pct": 25,
+            "stop_loss_pct": -3.0
+        }
 
 
 if __name__ == "__main__":

@@ -238,6 +238,46 @@ async def get_sector_fund_flow(x_api_token: Optional[str] = Header(None)):
     return result
 
 
+@app.get("/api/v1/fund/etf")
+async def get_etf_fund_flow(
+    indicator: str = Query("今日", description="时间指标: 今日/3日/5日"),
+    x_api_token: Optional[str] = Header(None)
+):
+    """获取ETF资金流向排名（V07规则）"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    result = data_service.get_etf_money_flow(indicator)
+    return result
+
+
+@app.get("/api/v1/fund/sector-ratio")
+async def get_sector_fund_flow_ratio(
+    limit: int = Query(20, description="返回板块数量"),
+    x_api_token: Optional[str] = Header(None)
+):
+    """获取板块主力净流入率（V05规则）"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    result = data_service.get_sector_money_flow_ratio(limit)
+    return result
+
+
+# ==================== 期指基差接口 ====================
+
+@app.get("/api/v1/futures/basis")
+async def get_futures_basis(
+    x_api_token: Optional[str] = Header(None)
+):
+    """获取沪深300期指基差（V06规则）"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    result = data_service.get_futures_basis()
+    return result
+
+
 # ==================== 财务接口 ====================
 
 @app.get("/api/v1/financial/{symbol}")
@@ -344,6 +384,134 @@ async def get_sentiment(x_api_token: Optional[str] = Header(None)):
     
     result = data_service.get_market_sentiment()
     return result
+
+
+@app.get("/api/v1/sentiment/panic")
+async def get_panic_index(x_api_token: Optional[str] = Header(None)):
+    """获取恐慌指数 (0-100, 越低越恐慌)"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    from src.main import _get_market_sentiment_enhanced
+    enhanced = _get_market_sentiment_enhanced()
+    
+    # 从增强情绪中提取恐慌指数
+    score = enhanced.get("market_sentiment_score", 50)
+    panic_idx = 100 - score  # 反转: 情绪高=恐慌低
+    panic_idx = max(0, min(100, panic_idx))
+    
+    if panic_idx >= 60:
+        label, level = "安全", "SAFE"
+    elif panic_idx >= 40:
+        label, level = "谨慎", "CAUTION"
+    elif panic_idx >= 25:
+        label, level = "偏冷", "COLD"
+    elif panic_idx >= 10:
+        label, level = "冰点", "FREEZE"
+    else:
+        label, level = "恐慌", "PANIC"
+    
+    return {
+        "panic_index": panic_idx,
+        "label": label,
+        "level": level,
+        "market_sentiment_score": score,
+        "reasons": enhanced.get("reasons", []),
+        "overview": enhanced.get("overview", {}),
+        "north_money_note": "北向资金已改为T+1盘后数据",
+        "timestamp": enhanced.get("timestamp", ""),
+    }
+
+
+@app.get("/api/v1/sentiment/timing")
+async def get_market_timing(x_api_token: Optional[str] = Header(None)):
+    """获取市场时机评估 (温度+恐慌+仓位建议)"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    from src.main import _get_market_sentiment_enhanced
+    enhanced = _get_market_sentiment_enhanced()
+    
+    score = enhanced.get("market_sentiment_score", 50)
+    panic_idx = max(0, min(100, 100 - score))
+    
+    # 温度计算
+    temperature = score
+    if temperature >= 70:
+        temp_label = "过热"
+        temp_level = "HIGH"
+    elif temperature >= 50:
+        temp_label = "正常"
+        temp_level = "NORMAL"
+    elif temperature >= 35:
+        temp_label = "偏冷"
+        temp_level = "COOL"
+    elif temperature >= 25:
+        temp_label = "冰点"
+        temp_level = "FREEZE"
+    else:
+        temp_label = "冰封"
+        temp_level = "PANIC"
+    
+    # 仓位建议 (温度仓位矩阵 v4.0)
+    if temperature >= 80:
+        max_position = 10
+    elif temperature >= 70:
+        max_position = 20
+    elif temperature >= 50:
+        max_position = 50
+    elif temperature >= 35:
+        max_position = 30
+    elif temperature >= 25:
+        max_position = 10
+    else:
+        max_position = 0
+    
+    # 交易建议
+    if panic_idx < 25 or temperature < 25:
+        advice = "🚫 恐慌/冰封期: 强制空仓，禁止开仓"
+        action = "FORCE_EMPTY"
+    elif temperature < 35:
+        advice = "⚠️ 冰点期: 禁止新开仓，仅可减仓或持有"
+        action = "HOLD_SELL"
+    elif panic_idx < 40:
+        advice = "⚠️ 偏冷: 谨慎轻仓，只做最强板块"
+        action = "CAUTION_BUY"
+    elif temperature < 50:
+        advice = "🌤️ 偏冷: 轻仓参与，快进快出"
+        action = "LIGHT_BUY"
+    elif temperature >= 70:
+        advice = "🔥 过热: 注意风险，逐步减仓"
+        action = "REDUCE"
+    else:
+        advice = "✅ 正常: 正常交易，控制仓位"
+        action = "NORMAL"
+    
+    return {
+        "market_temperature": temperature,
+        "temperature_label": temp_label,
+        "temperature_level": temp_level,
+        "panic_index": panic_idx,
+        "max_position_pct": max_position,
+        "trade_advice": advice,
+        "recommended_action": action,
+        "reasons": enhanced.get("reasons", []),
+        "indices": enhanced.get("indices", []),
+        "top_sector": (enhanced.get("sector_flow") or [None])[0] if enhanced.get("sector_flow") else None,
+        "north_money_note": "北向资金已改为T+1盘后数据",
+        "version": "v4.0",
+        "timestamp": enhanced.get("timestamp", ""),
+    }
+
+
+@app.get("/api/v1/sentiment/enhanced")
+async def get_sentiment_enhanced(x_api_token: Optional[str] = Header(None)):
+    """获取增强版市场情绪"""
+    if x_api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API Token")
+    
+    from src.main import _get_market_sentiment_enhanced
+    return _get_market_sentiment_enhanced()
 
 
 # ==================== 通用工具调用接口 ====================

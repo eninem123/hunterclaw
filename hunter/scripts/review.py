@@ -15,6 +15,45 @@ LOG_DIR = DATA_DIR / "logs"
 REVIEW_DIR = DATA_DIR / "reviews"
 PORTFOLIO_FILE = DATA_DIR / "portfolio.json"
 
+
+
+# ----------------------------------------------------------------------
+# 交易日检查（前置条件）- 2026-05-11 修复
+# ----------------------------------------------------------------------
+def is_trading_day(check_date):
+    """检查指定日期是否为交易日"""
+    if check_date.weekday() >= 5:
+        return False
+    try:
+        import akshare as ak
+        import pandas as pd
+        trade_cal = ak.tool_trade_date_hist_sina()
+        trade_dates = set(pd.to_datetime(trade_cal["trade_date"]).dt.date)
+        return check_date in trade_dates
+    except Exception as e:
+        print("[WARN] Failed to fetch trade calendar: " + str(e), file=sys.stderr)
+        return True  # 网络失败时默认放行
+
+def check_trading_day_before_review():
+    """复盘前检查交易日，非交易日直接退出"""
+    if len(sys.argv) > 1:
+        try:
+            target_date = date.fromisoformat(sys.argv[1])
+        except ValueError:
+            target_date = date.today() - timedelta(days=1)
+    else:
+        target_date = date.today() - timedelta(days=1)  # 默认昨天
+    
+    if not is_trading_day(target_date):
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        weekday = weekday_names[target_date.weekday()]
+        print("[INFO] " + str(target_date) + " (" + weekday + ") 非交易日，复盘跳过")
+        sys.exit(0)
+    return target_date
+
+# 执行交易日检查
+_review_date = check_trading_day_before_review()
+
 # ─────────────────────────────────────────────
 # 工具函数
 # ─────────────────────────────────────────────

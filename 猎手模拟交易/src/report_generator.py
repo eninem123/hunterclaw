@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""持仓汇报生成器 - 腾讯实时行情（快）"""
+"""持仓汇报生成器 - 腾讯实时行情（快）
+【BUG修复】2026-05-13:
+  - 添加take_profit_2显示
+  - 添加持仓标签(tag)显示
+"""
 import sys, json, os, urllib.request
 from datetime import datetime
 
@@ -95,10 +99,28 @@ for pos in portfolio['positions']:
     pnl_pct = pos.get('pnl_pct', 0)
     emoji = '🟢' if pnl_val >= 0 else '🔴'
     dist_sl = (c/pos['stop_loss']-1)*100
-    dist_tp = (pos['take_profit']/c-1)*100
+    tp1 = pos.get('take_profit_1', pos.get('take_profit'))
+    tp2 = pos.get('take_profit_2')
+    dist_tp1 = (tp1/c-1)*100 if tp1 else 0
     info = info_map.get(pos['code'], {})
+    
+    # 【BUG修复】读取持仓标签，转换为对应emoji
+    tag = pos.get('tag', '')
+    if tag == '主线投资':
+        tag_emoji = '🟢'  # 主线投资用绿色
+    elif tag == '观察候选':
+        tag_emoji = '🟡'  # 观察候选用黄色
+    elif tag == '短线投机':
+        tag_emoji = '🔴'  # 短线投机组红色
+    else:
+        tag_emoji = ''  # 无标签则用盈亏emoji
+        if pnl_val >= 0:
+            tag_emoji = '🟢'
+        else:
+            tag_emoji = '🔴'
+    tag_display = f"{tag_emoji}{tag}" if tag else emoji
 
-    lines.append(f"### {emoji} {pos['name']}({pos['code']})")
+    lines.append(f"### {tag_display} {pos['name']}({pos['code']})")
     if info:
         chg = info['price'] - info['prev_close']
         chg_pct = (info['price']/info['prev_close']-1)*100 if info['prev_close'] else 0
@@ -111,10 +133,13 @@ for pos in portfolio['positions']:
     lines.append(f"| 持仓数量 | {pos['shares']}股 |")
     lines.append(f"| 买入日期 | {pos['buy_date']} |")
     lines.append(f"| **浮盈亏** | ¥{pnl_val:,.2f} ({pnl_pct:+.2f}%) |")
-    lines.append(f"| 止损价 | ¥{pos['stop_loss']} (-{pos['stop_loss_pct']}%) |")
-    lines.append(f"| 止盈价 | ¥{pos['take_profit']} (+{pos['take_profit_pct']}%) |")
+    lines.append(f"| 止损价 | ¥{pos['stop_loss']} (-{pos.get('stop_loss_pct', 5)}%) |")
+    lines.append(f"| 止盈1 | ¥{tp1} (+{pos.get('take_profit_1_pct', 10)}%) |")
+    # 【BUG修复】显示止盈2
+    if tp2:
+        lines.append(f"| 止盈2 | ¥{tp2} |")
     lines.append(f"| 距止损 | {dist_sl:+.1f}% |")
-    lines.append(f"| 距止盈 | {dist_tp:+.1f}% |")
+    lines.append(f"| 距止盈1 | {dist_tp1:+.1f}% |")
     lines.append("")
 
 lines.append("---")
@@ -128,11 +153,16 @@ for pos in portfolio['positions']:
         continue
     c = pos.get('current_price', pos['entry_price'])
     pnl_pct = pos.get('pnl_pct', 0)
+    tp1 = pos.get('take_profit_1', pos.get('take_profit'))
+    tp2 = pos.get('take_profit_2')
     if c <= pos['stop_loss']:
         lines.append(f"🔴 【止损信号】{pos['name']} 现价¥{c} ≤ 止损价¥{pos['stop_loss']}！浮亏{pnl_pct:.2f}%，建议止损！")
         has_signal = True
-    elif c >= pos['take_profit']:
-        lines.append(f"🟢 【止盈信号】{pos['name']} 现价¥{c} ≥ 止盈价¥{pos['take_profit']}！浮盈{pnl_pct:.2f}%，建议止盈！")
+    elif tp2 and c >= tp2:
+        lines.append(f"🟢 【止盈信号-第二目标】{pos['name']} 现价¥{c} ≥ 止盈2¥{tp2}！浮盈{pnl_pct:.2f}%，建议止盈！")
+        has_signal = True
+    elif c >= tp1:
+        lines.append(f"🟡 【止盈信号-第一目标】{pos['name']} 现价¥{c} ≥ 止盈1¥{tp1}！浮盈{pnl_pct:.2f}%，建议止盈！")
         has_signal = True
 
 if not has_signal:
@@ -148,7 +178,9 @@ if not portfolio['history']:
 else:
     for h in reversed(portfolio['history'][-10:]):
         if h['action'] == 'BUY':
-            lines.append(f"- [{h['date']}] 🟢 买入 **{h['name']}** {h['shares']}股 @{h['price']}")
+            tag = h.get('tag', '')
+            tag_str = f"[{tag}]" if tag else ""
+            lines.append(f"- [{h['date']}] 🟢 买入 **{h['name']}** {h['shares']}股 @{h['price']} {tag_str}")
         else:
             reason = h.get('reason', '')
             lines.append(f"- [{h['date']}] 🔴 卖出 **{h['name']}** 原因: {reason}")

@@ -29,6 +29,18 @@ class MemoryCache:
         self._lock = threading.RLock()
         self._hits = 0
         self._misses = 0
+        self._expired_count = 0
+        # 启动自动清理线程
+        self._start_cleanup_thread()
+    
+    def _start_cleanup_thread(self):
+        """启动自动清理过期缓存的守护线程"""
+        def cleanup_loop():
+            while True:
+                time.sleep(60)  # 每分钟清理一次
+                self.clear_expired()
+        thread = threading.Thread(target=cleanup_loop, daemon=True)
+        thread.start()
     
     def get(self, key: str) -> Optional[Any]:
         """获取缓存值"""
@@ -41,6 +53,7 @@ class MemoryCache:
             if item.is_expired():
                 del self._cache[key]
                 self._misses += 1
+                self._expired_count += 1
                 return None
             
             self._hits += 1
@@ -80,19 +93,42 @@ class MemoryCache:
             for key in expired_keys:
                 del self._cache[key]
                 count += 1
+            self._expired_count += count
         return count
+    
+    def _estimate_memory(self) -> int:
+        """估算当前缓存占用的内存字节数"""
+        import sys as _sys
+        total = 0
+        with self._lock:
+            for key, item in self._cache.items():
+                total += _sys.getsizeof(key)
+                total += _sys.getsizeof(item.value)
+                total += _sys.getsizeof(item.expire_at)
+        return total
     
     def stats(self) -> Dict[str, Any]:
         """获取缓存统计"""
         with self._lock:
             total = self._hits + self._misses
             hit_rate = self._hits / total if total > 0 else 0
+            memory_bytes = self._estimate_memory()
+            # 格式化内存大小
+            if memory_bytes > 1024 * 1024:
+                memory_str = f"{memory_bytes / 1024 / 1024:.2f} MB"
+            elif memory_bytes > 1024:
+                memory_str = f"{memory_bytes / 1024:.2f} KB"
+            else:
+                memory_str = f"{memory_bytes} B"
             return {
                 "hits": self._hits,
                 "misses": self._misses,
                 "total": total,
                 "hit_rate": round(hit_rate, 4),
-                "items": len(self._cache)
+                "items": len(self._cache),
+                "expired_count": self._expired_count,
+                "memory_estimate_bytes": memory_bytes,
+                "memory_estimate": memory_str
             }
 
 
@@ -138,6 +174,34 @@ class CacheManager:
     
     def get_sector_key(self, sector_type: str) -> str:
         return self.make_key("sector", "list", sector_type)
+
+
+    # ── 兼容 API Server v2 接口 ──────────────────────
+    def get(self, key: str) -> Optional[Any]:
+        """获取缓存值（直接委托给 MemoryCache）"""
+        return self.cache.get(key)
+
+    def set(self, key: str, value: Any, ttl: int = 300) -> None:
+        """设置缓存值（直接委托给 MemoryCache）"""
+        self.cache.set(key, value, ttl)
+
+    def clear(self) -> None:
+        """清空所有缓存（直接委托给 MemoryCache）"""
+        self.cache.clear()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计（统一格式，兼容 api_server_v2）"""
+        stats = self.cache.stats()
+        return {
+            "hits": stats["hits"],
+            "misses": stats["misses"],
+            "hit_rate": round(stats["hit_rate"] * 100, 2),
+            "size": stats["items"]
+        }
+
+    def delete(self, key: str) -> bool:
+        """删除指定缓存键"""
+        return self.cache.delete(key)
 
 
 # 全局缓存实例

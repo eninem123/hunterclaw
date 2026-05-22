@@ -69,7 +69,6 @@ if __name__ == "__main__":
         print("  休市期间不生成假行情数据")
         sys.exit(0)
 
-    if not is_trading:
     
         weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
         today_label = weekday_names[date.today().weekday()]

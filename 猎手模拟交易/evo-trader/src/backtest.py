@@ -408,47 +408,73 @@ class BacktestRunner:
     
     def test_strategy(self, symbol, gene, days=60):
         """测试单个策略"""
-        # 优先从 parquet 缓存加载数据，避免网络请求
-        cache_file = self.data_fetcher.quotes_dir / f"{symbol}.parquet"
-        if cache_file.exists() and cache_file.stat().st_size > 0:
+        # 优先从 CSV 或 parquet 缓存加载数据，避免网络请求
+        csv_options = [f'{symbol}_day_{days}.csv', f'{symbol}_day_120.csv', f'{symbol}_day_60.csv']
+        parquet_file = self.data_fetcher.quotes_dir / f"{symbol}.parquet"
+        
+        df = None
+        
+        # 检查parquet缓存
+        if parquet_file.exists() and parquet_file.stat().st_size > 0:
             try:
-                df = pd.read_parquet(cache_file)
-                # 取最近 N 个交易日
-                df = df.tail(days).copy()
-                if len(df) >= 30:
-                    metrics = self.backtest_engine.run(symbol, df, gene)
-                    return metrics
+                df = pd.read_parquet(parquet_file)
             except Exception:
                 pass
         
-        # 缓存无效时才走网络请求
-        df = self.data_fetcher.get_daily_data(symbol, days)
+        # 检查CSV缓存
         if df is None or len(df) < 30:
-            return None
+            for csv_name in csv_options:
+                csv_file = self.data_fetcher.quotes_dir / csv_name
+                if csv_file.exists() and csv_file.stat().st_size > 0:
+                    try:
+                        df = pd.read_csv(csv_file)
+                        df['trade_date'] = pd.to_datetime(df['date'])
+                        break
+                    except Exception:
+                        pass
         
-        # 运行回测
-        metrics = self.backtest_engine.run(symbol, df, gene)
+        if df is not None and len(df) >= 30:
+            df = df.tail(days).copy()
+            metrics = self.backtest_engine.run(symbol, df, gene)
+            return metrics
         
-        return metrics
+        return None
     
     def batch_test_strategies(self, symbols, genes):
         """批量测试策略"""
         # 只测试有缓存数据的股票，跳过网络失败的
         cached_symbols = []
         for sym in symbols[:10]:
-            cache_file = self.data_fetcher.quotes_dir / f"{sym}.parquet"
-            if cache_file.exists() and cache_file.stat().st_size > 0:
+            # 检查parquet缓存
+            parquet_file = self.data_fetcher.quotes_dir / f"{sym}.parquet"
+            csv_options = [f"{sym}_day_120.csv", f"{sym}_day_60.csv", f"{sym}_day_30.csv"]
+            cache_found = False
+            
+            if parquet_file.exists() and parquet_file.stat().st_size > 0:
                 try:
-                    df = pd.read_parquet(cache_file)
+                    df = pd.read_parquet(parquet_file)
                     if len(df) >= 30:
                         cached_symbols.append(sym)
+                        cache_found = True
                         continue
                 except Exception:
                     pass
-            # 无缓存且网络失败，print一次警告（重试已在内）
+            
+            if not cache_found:
+                for csv_name in csv_options:
+                    csv_file = self.data_fetcher.quotes_dir / csv_name
+                    if csv_file.exists() and csv_file.stat().st_size > 0:
+                        try:
+                            df = pd.read_csv(csv_file)
+                            if len(df) >= 30:
+                                cached_symbols.append(sym)
+                                cache_found = True
+                                break
+                        except Exception:
+                            pass
         
         if cached_symbols:
-            print(f"  批量测试仅用 {len(cached_symbols)} 只有效缓存股票: {cached_symbols}")
+            print(f"  批量测试使用 {len(cached_symbols)} 只有效缓存股票: {cached_symbols}")
         else:
             print("  警告: 无有效缓存股票，策略评估可能失败")
             cached_symbols = symbols[:3]  # fallback to original list

@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, date
 from pathlib import Path
 
-PORTFOLIO_FILE = "/root/.openclaw/workspace/猎手模拟交易/持仓.json"
+PORTFOLIO_FILE = "/root/.openclaw/workspace/持仓.json"
 STATE_FILE = "/root/.openclaw/workspace/猎手模拟交易/trade_state.json"
 DELIVERY_QUEUE = "/root/.openclaw/delivery-queue"
 WECHAT_ID = "o9cq801u9_6B8BEUnp-foIPm8pP0@im.wechat"
@@ -176,7 +176,7 @@ def check_risk_control(portfolio, current_prices):
         current_prices.get(p["code"], p["entry_price"]) * p["shares"]
         for p in portfolio["positions"] if p["status"] == "holding"
     )
-    cost_basis = sum(p["cost"] for p in portfolio["positions"])
+    cost_basis = sum(p.get("cost", round(p.get("entry_price",0) * p.get("shares",0),2)) for p in portfolio["positions"])
     if cost_basis > 0:
         drawdown = (total_value - cost_basis) / cost_basis * 100
         if drawdown <= -3:
@@ -190,7 +190,7 @@ def can_buy(state, portfolio, code, cost):
         return False
     if state["today_buys"] >= MAX_BUYS_PER_DAY:
         return False
-    total_value = portfolio["cash"] + sum(p["cost"] for p in portfolio["positions"])
+    total_value = portfolio["cash"] + sum(p.get("cost", round(p.get("entry_price",0) * p.get("shares",0),2)) for p in portfolio["positions"])
     if cost > total_value * MAX_POSITION_PCT / 100:
         return False
     if cost > portfolio["cash"]:
@@ -287,7 +287,7 @@ def auto_sell(state, portfolio, code, reason, current_prices=None):
             portfolio["history"].append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "action": "SELL_AUTO", "code": code, "name": pos["name"],
-                "reason": reason, "entry_price": entry, "cost": pos["cost"],
+                "reason": reason, "entry_price": entry, "cost": pos.get("cost", round(entry * pos.get("shares", 0), 2)),
                 "sell_price": price, "sell_value": sell_value,
                 "pnl_pct": round(pnl_pct, 2), "pnl_val": round(pnl_val, 2)
             })
@@ -397,9 +397,10 @@ def push_portfolio_status(portfolio):
         cur = current_prices.get(pos["code"], pos["entry_price"])
         pnl = (cur / pos["entry_price"] - 1) * 100
         emoji = "🟢" if pnl >= 0 else "🔴"
+        tp1 = pos.get('take_profit_1', pos.get('take_profit'))
         lines.append(
             f"{emoji} {pos['name']} @{cur} ({pnl:+.2f}%)\n"
-            f"   止损{pos['stop_loss']} | 止盈{pos['take_profit']}"
+            f"   止损{pos['stop_loss']} | 止盈1 {tp1}"
         )
     lines.append(f"\n现金：¥{portfolio['cash']:,.0f}")
     lines.append(f"总市值：¥{total_value:,.0f}")
@@ -416,7 +417,8 @@ def execute_buy_candidates(state, portfolio):
         candidates = pick_best_candidates(
             max_count=MAX_BUYS_PER_DAY - state["today_buys"], min_score=5
         )
-        signal_file = "/root/.hermes/猎手模拟交易/信号队列"
+        today_str = date.today().isoformat()
+        signal_file = f"/root/.hermes/猎手模拟交易/信号队列/{today_str}_signals.jsonl"
         for c in candidates:
             code, name, price = c["code"], c["name"], c["price"]
             shares = calculate_buy_quantity(price, portfolio["cash"], MAX_POSITION_PCT)

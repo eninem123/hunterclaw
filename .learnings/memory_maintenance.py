@@ -18,7 +18,10 @@ def log(msg):
     print(f"[记忆整理] {msg}")
 
 def get_file_age_days(path):
-    return (datetime.now() - datetime.fromtimestamp(os.path.getmtime(path))).days
+    try:
+        return (datetime.now() - datetime.fromtimestamp(os.path.getmtime(path))).days
+    except (FileNotFoundError, OSError):
+        return 0  # 文件已被删除，视为过期
 
 # ========== 1. 清理临时文件 ==========
 def clean_temp_files():
@@ -32,7 +35,10 @@ def clean_temp_files():
             for f in files:
                 if f.endswith(p.replace('*', '')) or f.startswith('test_'):
                     path = os.path.join(root, f)
-                    age = get_file_age_days(path)
+                    try:
+                        age = get_file_age_days(path)
+                    except:
+                        continue
                     if age >= 7:  # 超过7天的临时文件
                         try:
                             os.remove(path)

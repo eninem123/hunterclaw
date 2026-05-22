@@ -1,41 +1,62 @@
 {
-  "cash": 42977.0,
+  "cash": 41690.0,
   "positions": [
     {
-      "code": "000977",
-      "name": "浪潮信息",
-      "shares": 100,
-      "entry_price": 72.8,
-      "cost": 7280.0,
-      "stop_loss": 65.0,
-      "take_profit_1": 80.08,
-      "take_profit_2": 86.0,
-      "buy_date": "2026-05-13",
+      "code": "600377",
+      "name": "宁沪高速",
+      "shares": 1000,
+      "entry_price": 12.345,
+      "close_price": 12.22,
+      "pnl": -125.0,
+      "stop_loss": 11.0,
+      "atr_stop": 12.0,
+      "take_profit": "13.50/14.50分批",
       "status": "holding",
-      "tag": "主线投资"
+      "tag": "🟣防御",
+      "note": "高股息防御，ATR止损12.0，距止损1.8%⚠️⚠️⚠️ FM-075已触发",
+      "cost": 12345.0
     },
     {
-      "code": "600362",
-      "name": "江西铜业",
-      "shares": 100,
-      "entry_price": 50.03,
-      "cost": 5003.0,
-      "stop_loss": 47.64,
-      "take_profit_1": 55.0,
-      "take_profit_2": 60.0,
-      "buy_date": "2026-05-13",
+      "code": "600795",
+      "name": "国电电力",
+      "shares": 2000,
+      "entry_price": 4.903,
+      "close_price": 4.89,
+      "pnl": -26.0,
+      "stop_loss": 4.51,
+      "atr_stop": 4.61,
+      "take_profit": "趋势跟踪",
       "status": "holding",
-      "tag": "观察候选"
+      "tag": "🟢长线",
+      "note": "Q1净利-22.79%需跟踪，止损-8%",
+      "cost": 9806.0
     }
   ],
-  "total_value": 60260.0,
-  "last_trade_date": "2026-05-14",
-  "market_temperature": 80,
-  "volume_growth": 32.9,
-  "strategy_version": "v3.13",
-  "notes": "v3.13 R17温度同步 | 持仓.json→80℃(与trade_state一致) | 浪潮TP2@77.17已到建议卖1/3 | 江西铜业观察",
-  "history": [
-    {"date": "2026-05-13", "action": "BUY", "code": "600362", "name": "江西铜业", "price": 50.03, "shares": 100, "tag": "观察候选"},
-    {"date": "2026-05-14", "action": "UPDATE", "code": "ALL", "name": "系统", "price": 0, "shares": 0, "tag": "v3.13升级"}
-  ]
+  "total_value": 63710.0,
+  "position_value": 24700.0,
+  "floating_pnl": -151.0,
+  "position_ratio": 0.38,
+  "last_trade_date": "2026-05-22",
+  "market_temperature": "红灯35分",
+  "volume_growth": -18.9,
+  "strategy_version": "v6.22",
+  "sync_note": "2026-05-22 16:20 猎手同步收盘数据：宁沪12.22(-0.97%), 国电4.89(-0.2%), 宁沪FM-075防御股陷阱已触发",
+  "notes": "v6.22同步 | FM-075已触发 | 宁沪距止损1.8%",
+  "conditions": {
+    "light_color": "红灯",
+    "light_score": 35,
+    "light_version": "v2.0",
+    "position_limit": 0.1,
+    "single_position_limit": 0.1,
+    "long_position_limit": 0.2
+  },
+  "market_status": {
+    "date": "2026-05-22",
+    "shanghai": 4115.51,
+    "shanghai_change": "+0.87%",
+    "chinext": "+2.84%",
+    "volume": "2.9万亿",
+    "volume_change": "-5782亿",
+    "north_bound": "待查"
+  }
 }

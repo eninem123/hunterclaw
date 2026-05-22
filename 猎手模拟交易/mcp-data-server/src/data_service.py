@@ -183,6 +183,38 @@ class DataService:
     
     # ==================== K线数据 ====================
     
+    @staticmethod
+    def _validate_date(date_str: str, field_name: str = "date") -> str:
+        """验证并格式化日期字符串
+        
+        Args:
+            date_str: 日期字符串（YYYYMMDD 或 YYYY-MM-DD）
+            field_name: 字段名（用于错误消息）
+        
+        Returns:
+            标准化的 YYYYMMDD 格式日期
+        """
+        if not date_str:
+            raise ValueError(f"{field_name} 不能为空")
+        
+        date_str = date_str.replace("-", "").replace("/", "")
+        
+        if len(date_str) != 8 or not date_str.isdigit():
+            raise ValueError(f"{field_name} 格式无效: {date_str}，需要 YYYYMMDD")
+        
+        year = int(date_str[:4])
+        month = int(date_str[4:6])
+        day = int(date_str[6:8])
+        
+        if year < 1990 or year > 2100:
+            raise ValueError(f"{field_name} 年份超出范围: {year}")
+        if month < 1 or month > 12:
+            raise ValueError(f"{field_name} 月份超出范围: {month}")
+        if day < 1 or day > 31:
+            raise ValueError(f"{field_name} 日期超出范围: {day}")
+        
+        return date_str
+
     def get_daily_kline(self, symbol: str, start_date: str = None, end_date: str = None, 
                         adjust: str = "qfq") -> Dict:
         """获取日K线数据"""
@@ -191,6 +223,21 @@ class DataService:
         if end_date is None:
             end_date = datetime.now().strftime("%Y%m%d")
         
+        # 日期范围验证
+        try:
+            start_date = self._validate_date(start_date, "start_date")
+            end_date = self._validate_date(end_date, "end_date")
+        except ValueError as ve:
+            return {"error": str(ve), "function": "get_daily_kline"}
+        
+        # 验证日期范围
+        start_dt = datetime.strptime(start_date, "%Y%m%d")
+        end_dt = datetime.strptime(end_date, "%Y%m%d")
+        if end_dt < start_dt:
+            return {"error": "end_date 不能早于 start_date", "function": "get_daily_kline"}
+        if (end_dt - start_dt).days > 365 * 5:
+            logger.warning(f"日期范围超过5年({(end_dt - start_dt).days}天)，可能影响性能")
+        
         cache_key = self.cache.get_kline_key(symbol, "daily", adjust)
         
         cached = self.cache.cache.get(cache_key)
@@ -198,6 +245,9 @@ class DataService:
             return {"data": cached, "source": "cache"}
         
         symbol_norm = self.cache.hash_symbol(symbol)
+        
+        # 降级链：依次尝试多种数据源
+        fallback_errors = []
         
         try:
             self._rate_limit()
@@ -236,8 +286,34 @@ class DataService:
             
             return {"data": data, "source": "akshare"}
         except Exception as e:
-            logger.error(f"获取日K线失败: {symbol} - {e}")
-            return {"error": str(e)}
+            fallback_errors.append(str(e))
+            logger.error(f"获取日K线失败(主源): {symbol} - {e}")
+            
+            # 降级1：尝试不复权
+            try:
+                self._rate_limit()
+                logger.info(f"降级获取不复权K线: {symbol}")
+                df = ak.stock_zh_a_hist(symbol_norm, period="daily",
+                                        start_date=start_date, end_date=end_date)
+                data = df.to_dict(orient='records')
+                self.cache.cache.set(cache_key, data, CacheManager.TTL_KLINE)
+                return {"data": data, "source": "akshare", "note": "降级使用不复权数据"}
+            except Exception as e2:
+                fallback_errors.append(str(e2))
+                
+                # 降级2：尝试东方财富接口
+                try:
+                    self._rate_limit()
+                    logger.info(f"降级使用东方财富K线: {symbol}")
+                    df = ak.stock_zh_a_hist(symbol_norm, period="daily",
+                                            start_date=start_date, end_date=end_date,
+                                            adjust="")
+                    data = df.to_dict(orient='records')
+                    return {"data": data, "source": "akshare_alt", "note": "降级使用备用接口"}
+                except Exception as e3:
+                    fallback_errors.append(str(e3))
+        
+        return {"error": "所有数据源均失败", "fallback_errors": fallback_errors}
     
     def get_weekly_kline(self, symbol: str, start_date: str = None, 
                          end_date: str = None) -> Dict:
@@ -560,7 +636,7 @@ class DataService:
     # ==================== 市场情绪 ====================
     
     def get_market_sentiment(self) -> Dict:
-        """获取市场情绪指标"""
+        """获取市场情绪指标（增强版）"""
         cache_key = self.cache.make_key("market", "sentiment")
         
         cached = self.cache.cache.get(cache_key)
@@ -568,10 +644,11 @@ class DataService:
             return {"data": cached, "source": "cache"}
         
         try:
-            # 涨跌家数
+            # 1. 涨跌家数概览
             overview = self.get_market_overview()
+            overview_data = overview.get("data") if "data" in overview else {}
             
-            # 恐慌贪婪指数 (如果有)
+            # 2. 恐慌贪婪指数
             fear_greed = None
             try:
                 self._rate_limit()
@@ -581,13 +658,71 @@ class DataService:
             except:
                 pass
             
-            # 外资动向
+            # 3. 外资动向（北向资金 — T+1盘后）
             north = self.get_north_money("daily")
+            north_data = north.get("data") if "data" in north else []
+            north_closing_change_day = north.get("closing_date", "")  # 未来可扩展
+            
+            # 4. 板块资金流向
+            sector_flow = None
+            try:
+                self._rate_limit()
+                sdf = ak.stock_sector_fund_flow_rank(indicator="今日")
+                if sdf is not None and not sdf.empty:
+                    sector_flow = sdf.head(5).to_dict(orient='records')
+            except:
+                pass
+            
+            # 5. 计算综合情绪评分
+            score = 50  # 中性基准
+            reasons = []
+            
+            if overview_data:
+                rising = overview_data.get("rising", 0)
+                falling = overview_data.get("falling", 0)
+                total = overview_data.get("total", 1)
+                limit_up = overview_data.get("limit_up", 0)
+                limit_down = overview_data.get("limit_down", 0)
+                
+                # 涨跌比评分
+                if total > 0 and falling > 0:
+                    ratio = rising / falling
+                    if ratio > 2:
+                        score += 15; reasons.append("涨跌比>2")
+                    elif ratio > 1.2:
+                        score += 8; reasons.append("涨跌比>1.2")
+                    elif ratio < 0.5:
+                        score -= 15; reasons.append("涨跌比<0.5")
+                    elif ratio < 0.8:
+                        score -= 8; reasons.append("涨跌比<0.8")
+                
+                # 涨跌停评分
+                if limit_up > 80:
+                    score += 10; reasons.append(f"涨停{limit_up}家")
+                elif limit_up > 100:
+                    score += 15; reasons.append(f"涨停{limit_up}家")
+                if limit_down > 10:
+                    score -= 10; reasons.append(f"跌停{limit_down}家")
+                elif limit_down > 30:
+                    score -= 15; reasons.append(f"跌停{limit_down}家")
+            
+            sentiment_label = (
+                "极度恐慌" if score <= 20 else
+                "偏恐慌" if score <= 40 else
+                "中性" if score <= 60 else
+                "偏乐观" if score <= 80 else
+                "极度乐观"
+            )
             
             data = {
-                "overview": overview.get("data") if "data" in overview else {},
-                "north_money": north.get("data") if "data" in north else [],
+                "market_sentiment_score": max(0, min(100, score)),
+                "sentiment_label": sentiment_label,
+                "score_reasons": reasons,
+                "overview": overview_data,
+                "north_money": north_data,
+                "north_money_note": "北向资金已于2026-05-13起改为T+1盘后数据，此处为最新盘后值",
                 "fear_greed": fear_greed,
+                "sector_flow_top5": sector_flow,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             

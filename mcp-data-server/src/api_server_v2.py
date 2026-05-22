@@ -439,6 +439,173 @@ async def get_rate_limit_config():
         "window_seconds": 60
     }
 
+# ── v2.1 新增端点 ─────────────────────────────────────
+
+@app.get("/api/v2/market/indices")
+async def get_market_indices(
+    _: bool = Depends(verify_token),
+    service: DataService = Depends(get_data_service)
+):
+    """获取全市场主要指数实时行情"""
+    index_codes = [
+        "sh000001", "sz399001", "sz399006", "sh000300",
+        "sh000016", "sz399905", "sh000688"
+    ]
+    tasks = [service.get_realtime_quote(code) for code in index_codes]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    indices = []
+    for r in results:
+        if isinstance(r, dict) and r:
+            indices.append(r)
+    
+    # 计算涨跌比和均幅
+    up_count = sum(1 for i in indices if i.get('chg_pct', 0) > 0)
+    down_count = sum(1 for i in indices if i.get('chg_pct', 0) < 0)
+    avg_chg = sum(i.get('chg_pct', 0) for i in indices) / max(len(indices), 1)
+    
+    return {
+        "indices": indices,
+        "breadth": {
+            "up": up_count,
+            "down": down_count,
+            "avg_chg_pct": round(avg_chg, 2),
+            "up_ratio": round(up_count / max(up_count + down_count, 1) * 100, 1)
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/v2/market/breadth")
+async def get_market_breadth(
+    _: bool = Depends(verify_token),
+    service: DataService = Depends(get_data_service)
+):
+    """获取市场广度数据（涨跌家数、涨停跌停统计）"""
+    overview = await service.get_market_overview()
+    if not overview:
+        raise HTTPException(status_code=404, detail="Market breadth data unavailable")
+    
+    sentiment = overview.get("market_sentiment", {})
+    up = sentiment.get("up", 0)
+    down = sentiment.get("down", 0)
+    total = up + down
+    
+    return {
+        "up_stocks": up,
+        "down_stocks": down,
+        "total_active": total,
+        "up_ratio": round(up / max(total, 1) * 100, 1),
+        "limit_up": sentiment.get("limit_up", 0),
+        "limit_down": sentiment.get("limit_down", 0),
+        "breadth_level": "强势" if up > down * 2 else ("偏强" if up > down else ("偏弱" if down > up * 2 else "均衡")),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/v2/market/temperature")
+async def get_market_temperature(
+    _: bool = Depends(verify_token),
+    service: DataService = Depends(get_data_service)
+):
+    """计算市场温度 (0-100) 和恐慌指数"""
+    overview = await service.get_market_overview()
+    if not overview:
+        raise HTTPException(status_code=404, detail="Market data unavailable")
+    
+    indices = overview.get("indices", [])
+    sentiment = overview.get("market_sentiment", {})
+    
+    # 温度计算（简化版）
+    score = 50
+    if indices:
+        avg_chg = sum(i.get("chg_pct", 0) for i in indices) / max(len(indices), 1)
+        score += avg_chg * 5
+    
+    up = sentiment.get("up", 0)
+    down = sentiment.get("down", 0)
+    total = max(up + down, 1)
+    breadth_ratio = up / total
+    score = score * 0.6 + breadth_ratio * 100 * 0.4
+    score = max(0, min(100, round(score)))
+    
+    # 恐慌指数（反向）
+    panic_score = max(0, min(100, round(100 - score * 0.8 - breadth_ratio * 20)))
+    
+    temp_label = "过热" if score >= 70 else ("正常" if score >= 50 else ("偏冷" if score >= 30 else "冰点"))
+    panic_label = "安全" if panic_score >= 60 else ("谨慎" if panic_score >= 40 else ("偏冷" if panic_score >= 25 else "冰点"))
+    
+    return {
+        "temperature": score,
+        "temperature_label": temp_label,
+        "panic_index": panic_score,
+        "panic_label": panic_label,
+        "breadth_ratio": round(breadth_ratio * 100, 1),
+        "avg_change_pct": round(avg_chg if indices else 0, 2),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/api/v2/batch/quotes")
+async def batch_quotes(
+    symbols: List[str],
+    _: bool = Depends(verify_token),
+    __: bool = Depends(check_rate_limit),
+    service: DataService = Depends(get_data_service)
+):
+    """批量获取实时行情（最多20只）"""
+    if len(symbols) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 symbols per batch request")
+    
+    tasks = [service.get_realtime_quote(sym) for sym in symbols]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    quotes = []
+    errors = []
+    for sym, r in zip(symbols, results):
+        if isinstance(r, dict) and r:
+            quotes.append(r)
+        else:
+            errors.append({"symbol": sym, "error": str(r) if r else "No data"})
+    
+    return {
+        "quotes": quotes,
+        "errors": errors,
+        "total": len(quotes),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/v2/health/metrics")
+async def health_metrics(_: bool = Depends(verify_token)):
+    """扩展健康检查：缓存详情+限流状态+系统信息"""
+    cache_stats = cache.get_stats()
+    
+    # Redis状态检查（如果可用）
+    redis_status = "disabled"
+    if hasattr(cache, 'redis_cache') and cache.redis_cache:
+        try:
+            redis_status = "connected" if cache.redis_cache.ping() else "error"
+        except Exception:
+            redis_status = "error"
+    
+    return {
+        "status": "healthy",
+        "version": "2.1.0",
+        "timestamp": datetime.now().isoformat(),
+        "uptime_seconds": round(time.time() - getattr(app.state, 'start_time', time.time()), 1),
+        "cache": {
+            **cache_stats,
+            "redis": redis_status
+        },
+        "rate_limiter": {
+            "active_clients": len(rate_limiter.requests),
+            "default_limit": config.RATE_LIMIT['default']
+        }
+    }
+
+@app.on_event("startup")
+async def startup_event():
+    """服务启动初始化"""
+    app.state.start_time = time.time()
+    logger.info("MCP数据服务器 v2.1 启动完成")
+
 # ── 异常处理 ───────────────────────────────────────────
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

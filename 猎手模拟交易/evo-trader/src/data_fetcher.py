@@ -113,7 +113,7 @@ class DataFetcher:
     def get_historical_data(self, code, start_date=None, end_date=None):
         """
         获取历史行情数据
-        优先使用Tushare，失败则降级到AKShare
+        优先使用本地CSV缓存，Tushare/AKShare仅作备用
         
         Args:
             code: 股票代码（6位数字）
@@ -128,11 +128,16 @@ class DataFetcher:
         if not end_date:
             end_date = datetime.now().strftime('%Y%m%d')
         
+        # 优先从本地CSV缓存读取（避免网络超时）
+        df = self._load_from_csv_cache(code, start_date, end_date)
+        if df is not None and not df.empty:
+            return df
+        
         # 确定市场
         market = 'SH' if code.startswith(('0', '6')) else 'SZ'
         ts_code = f"{code}.{market}"
         
-        # 优先使用Tushare
+        # 备用：使用Tushare
         if self.ts:
             try:
                 df = self.ts.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
@@ -142,11 +147,12 @@ class DataFetcher:
             except Exception as e:
                 print(f"Tushare获取{code}数据失败: {e}, 降级到AKShare")
         
-        # 降级到AKShare
+        # 备用：降级到AKShare（设超时，离线时快速跳过）
         try:
-            # AKShare使用symbol格式（sh600000, sz000001）
-            ak_symbol = f"sh{code}" if code.startswith(('0', '6')) else f"sz{code}"
+            old_timeout = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(5)  # 5秒超时
             df = ak.stock_zh_a_hist(symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+            socket.setdefaulttimeout(old_timeout)
             if not df.empty:
                 df = df.sort_values('日期')
                 df = df.rename(columns={
@@ -160,9 +166,36 @@ class DataFetcher:
                 })
                 return df
         except Exception as e:
+            socket.setdefaulttimeout(30)  # 恢复默认
             print(f"AKShare获取{code}数据失败: {e}")
         
         return pd.DataFrame()
+    
+    def _load_from_csv_cache(self, code, start_date=None, end_date=None):
+        """从本地CSV缓存加载数据"""
+        try:
+            for suffix in ['_day_120.csv', '_day_60.csv', '_day_30.csv', '_day_10.csv']:
+                cache_path = self.quotes_dir / f"{code}{suffix}"
+                if cache_path.exists():
+                    df = pd.read_csv(cache_path)
+                    df['trade_date'] = pd.to_datetime(df['date'])
+                    df = df.sort_values('trade_date')
+                    if 'volume' in df.columns and 'vol' not in df.columns:
+                        df['vol'] = df['volume']
+                    if 'amount' not in df.columns:
+                        df['amount'] = df['close'] * df['vol']
+                    if start_date:
+                        start_dt = pd.to_datetime(start_date, format='%Y%m%d')
+                        df = df[df['trade_date'] >= start_dt]
+                    if end_date:
+                        end_dt = pd.to_datetime(end_date, format='%Y%m%d')
+                        df = df[df['trade_date'] <= end_dt]
+                    if not df.empty:
+                        print(f"  本地缓存读取{code}数据: {len(df)}条")
+                        return df
+        except Exception as e:
+            print(f"本地缓存读取{code}数据失败: {e}")
+        return None
         
     def get_multiple_stocks_data(self, codes, start_date=None, end_date=None, limit=15):
         """
@@ -195,8 +228,12 @@ class DataFetcher:
         
     def update_all_data(self):
         """更新所有股票数据（从本地缓存加载）"""
-        # 本版本从本地缓存读取，不需要更新
-        # 如需联网更新，可遍历股票池调用 get_historical_data
+        print(f"  加载数据缓存，共 {len(self.stock_pool)} 只股票...")
+        for i, stock in enumerate(self.stock_pool):
+            code = stock['code'] if isinstance(stock, dict) else stock
+            cache_path = self.quotes_dir / f"{code}_day_120.csv"
+            if cache_path.exists():
+                continue
         print(f"  数据缓存就绪，共 {len(self.stock_pool)} 只股票")
         pass
     

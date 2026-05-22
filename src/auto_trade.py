@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, date
 from pathlib import Path
 
-PORTFOLIO_FILE = "/root/.openclaw/workspace/猎手模拟交易/持仓.json"
+PORTFOLIO_FILE = "/root/.openclaw/workspace/持仓.json"
 STATE_FILE = "/root/.openclaw/workspace/猎手模拟交易/trade_state.json"
 DELIVERY_QUEUE = "/root/.openclaw/delivery-queue"
 WECHAT_ID = "o9cq801u9_6B8BEUnp-foIPm8pP0@im.wechat"
