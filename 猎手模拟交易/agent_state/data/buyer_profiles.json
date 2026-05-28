@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "updated": "2026-05-28",
+  "profiles": {
+    "investor": {
+      "name": "投资购房",
+      "priority": ["租售比", "流动性", "学区溢价", "买卖差价"],
+      "rules": {
+        "rent_yield_min": 2.0,
+        "vacancy_days_max": 30,
+        "liquidity_score_min": 7,
+        "orientation_pref": ["东南", "南"],
+        "avoid": ["北向", "顶楼", "一楼"],
+        "hold_years": "3-5",
+        "exit_strategy": "满五唯一+学区溢价退出"
+      },
+      "estates": {
+        "绿景花园二期": {
+          "score": 6,
+          "reason": "北向打折, 租售比1.6%偏低, 但新洲学区流动性尚可",
+          "action": "持有等待学区溢价, 非优选买入"
+        },
+        "花好园": {
+          "score": 7,
+          "reason": "南向+68平总价低, 租售比尚可, 流动性好",
+          "action": "可买入, 适合短线持有"
+        },
+        "园岭新村": {
+          "score": 8,
+          "reason": "园岭顶级学区溢价高, 75平3房刚需盘, 流动性极好",
+          "action": "优选买入, 学区溢价确定性强"
+        }
+      }
+    },
+    "owner_occupier": {
+      "name": "刚需购房",
+      "priority": ["学区确定", "通勤距离", "居住舒适度", "积分安全"],
+      "rules": {
+        "school_district_must": true,
+        "commute_max_min": 45,
+        "bedrooms_min": 2,
+        "point_safety_margin": 10,
+        "enrollment_year": 2029,
+        "orientation_pref": ["南", "东南", "东"]
+      },
+      "estates": {
+        "绿景花园二期": {
+          "score": 8,
+          "reason": "当前自住, 绿洲小学+红岭实验确定, 积分充足",
+          "action": "继续持有, 积分截止2029.4.30前确保资格"
+        },
+        "花好园": {
+          "score": 7,
+          "reason": "同学区, 2室1厅略小, 南向采光补偿",
+          "action": "可换, 但面积偏小不适合3口之家长期"
+        },
+        "园岭新村": {
+          "score": 9,
+          "reason": "园岭顶级学区, 3室1厅适合家庭, 保值性强",
+          "action": "最优选, 但需额外购房资金"
+        }
+      }
+    }
+  }
+}

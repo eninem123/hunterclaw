@@ -174,3 +174,21 @@ hunterclaw/
 
 # ===== 猎手模拟交易 skills =====
 猎手模拟交易/skills/
+猎手模拟交易/agent_state/chromadb/
+猎手模拟交易/agent_state/__pycache__/
+*.sqlite3
+__pycache__/
+猎手模拟交易/agent_state/chromadb/
+*.sqlite3
+__pycache__/
+*.pyc
+config/openclaw_config.json
+config/hermes_config.yaml
+node_modules/
+猎手模拟交易/agent_state/chromadb/
+*.sqlite3
+__pycache__/
+*.pyc
+config/openclaw_config.json
+config/hermes_config.yaml
+node_modules/

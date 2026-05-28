@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-05-28 19:38",
+  "estates": [
+    {
+      "name": "绿景花园二期",
+      "district": "福田新洲",
+      "area": 70.14,
+      "layout": "2室2厅",
+      "orientation": "北向",
+      "current_rent": 7300,
+      "rent_per_sqm": 104.1,
+      "school_district": "红岭实验学校(新洲)",
+      "primary_school": "绿洲小学",
+      "notes": "满五唯一, 中低楼层"
+    },
+    {
+      "name": "花好园",
+      "district": "福田新洲",
+      "area": 68,
+      "layout": "2室1厅",
+      "orientation": "南向",
+      "current_rent": 6900,
+      "rent_per_sqm": 101.5,
+      "school_district": "红岭实验学校(新洲)",
+      "primary_school": "绿洲小学",
+      "notes": "南向采光好"
+    },
+    {
+      "name": "园岭新村",
+      "district": "福田园岭",
+      "area": 75,
+      "layout": "3室1厅",
+      "orientation": "南向",
+      "current_rent": 8100,
+      "rent_per_sqm": 108.0,
+      "school_district": "红岭中学园岭校区",
+      "primary_school": "园岭小学",
+      "notes": "园岭学区, 顶级学位"
+    }
+  ]
+}

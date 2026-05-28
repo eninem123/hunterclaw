@@ -1,0 +1,8 @@
+0 15 * * 1-5 cd /root/.openclaw/workspace/猎手模拟交易 && python3 intraday_analyzer.py >> /tmp/intraday.log 2>&1
+0 8 * * * cd /root/.openclaw/workspace/能力训练 && python3 daily_skill_train.py >> /tmp/skill_train.log 2>&1
+0 8 * * * python3 /opt/agent_state/data/futian_xuequ_monitor.py >> /opt/agent_state/data/xuequ_monitor.log 2>&1
+*/10 * * * * /opt/agent_state/healthcheck.sh >> /opt/agent_state/healthcheck.log 2>&1
+*/10 * * * * /usr/bin/python3 /opt/agent_state/inbox_poll.py >> /tmp/inbox_poll.log 2>&1
+30 11 * * 1-5 cd /root/.openclaw/workspace/猎手模拟交易 && python3 intraday_analyzer.py >> /tmp/intraday.log 2>&1
+30 8 * * * cd /root/.openclaw/workspace/能力训练 && python3 evolution_tasks.py >> /tmp/evolution.log 2>&1
+30 9 * * 1-5 cd /root/.openclaw/workspace/猎手模拟交易 && python3 intraday_analyzer.py >> /tmp/intraday.log 2>&1

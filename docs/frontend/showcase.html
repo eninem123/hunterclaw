@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>谭程俊 × AI 助理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e14;--card:#111820;--border:rgba(148,163,184,.15);--accent:#00e87b;--accent2:#38bdf8;--text:#e2e8f0;--muted:#94a3b8}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+
+/* Hero */
+.hero{text-align:center;padding:3rem 0}
+.hero .badge{display:inline-block;background:rgba(0,232,123,.1);color:var(--accent);font-size:.78rem;padding:.3rem .8rem;border-radius:6px;border:1px solid rgba(0,232,123,.2);margin-bottom:1rem}
+.hero h1{font-size:2.2rem;font-weight:800}
+.hero h1 .x{color:var(--accent);margin:0 .3rem}
+.hero .sub{color:var(--muted);margin-top:.5rem;font-size:.95rem}
+.stats{display:flex;justify-content:center;gap:2rem;margin-top:2rem;flex-wrap:wrap}
+.stat{text-align:center}
+.stat .num{font-size:2rem;font-weight:800;color:var(--accent)}
+.stat .label{font-size:.78rem;color:var(--muted);margin-top:.25rem}
+
+/* Nav */
+.nav{display:flex;justify-content:center;gap:.75rem;margin:1.5rem 0;flex-wrap:wrap}
+.nav a{background:var(--card);border:1px solid var(--border);padding:.5rem 1.2rem;border-radius:10px;font-size:.85rem;color:var(--text);transition:all .2s}
+.nav a:hover{border-color:var(--accent);text-decoration:none;color:var(--accent)}
+
+/* Section */
+.section{padding:2.5rem 0;border-top:1px solid var(--border)}
+.section-title{font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+
+/* Scenario cards */
+.scenario-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:640px){.scenario-grid{grid-template-columns:1fr 1fr}}
+.scenario-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;cursor:pointer;transition:all .25s}
+.scenario-card:hover{border-color:rgba(0,232,123,.4);transform:translateY(-2px)}
+.scenario-card .icon{font-size:1.5rem;margin-bottom:.5rem}
+.scenario-card h3{font-size:.95rem;font-weight:700;margin-bottom:.35rem}
+.scenario-card p{font-size:.82rem;color:var(--muted)}
+
+/* Chat */
+.chat-box{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:1.5rem}
+.chat-header{padding:.75rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.chat-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.chat-body{padding:1rem;min-height:80px}
+.chat-msg{font-size:.85rem;color:var(--muted);line-height:1.6}
+.chat-msg .bot-name{color:var(--accent);font-weight:600}
+.chat-input-wrap{display:flex;gap:.5rem;padding:.75rem 1rem;border-top:1px solid var(--border)}
+.chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;color:var(--text);font-size:.85rem;outline:none}
+.chat-input:focus{border-color:var(--accent)}
+.chat-send{background:var(--accent);color:#000;border:none;padding:.5rem 1rem;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;transition:opacity .2s}
+.chat-send:hover{opacity:.85}
+
+/* Project cards */
+.proj-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:640px){.proj-grid{grid-template-columns:1fr 1fr}}
+.proj-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;transition:border-color .2s}
+.proj-card:hover{border-color:rgba(0,232,123,.3)}
+.proj-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;font-weight:600}
+.badge-live{background:rgba(0,255,136,.12);color:#00ff88}
+.badge-gh{background:rgba(56,189,248,.1);color:var(--accent2)}
+.badge-star{background:rgba(251,191,36,.1);color:#fbbf24}
+.proj-card h3{font-size:.9rem;font-weight:700;margin:.5rem 0 .35rem}
+.proj-card p{font-size:.8rem;color:var(--muted);line-height:1.5}
+.proj-tags{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
+.proj-tags span{font-size:.7rem;background:rgba(56,189,248,.08);color:var(--accent2);padding:.15rem .5rem;border-radius:4px;border:1px solid rgba(56,189,248,.12)}
+
+/* Skill */
+.skill-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:640px){.skill-grid{grid-template-columns:1fr 1fr;grid-template-columns:repeat(3,1fr)}}
+.skill-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem}
+.skill-card h3{font-size:.9rem;font-weight:700;margin-bottom:.5rem}
+.skill-card p{font-size:.78rem;color:var(--muted);line-height:1.5}
+
+/* Timeline */
+.timeline{position:relative;padding-left:1.5rem}
+.timeline::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-item{position:relative;padding-bottom:1.5rem}
+.tl-item::before{content:"";position:absolute;left:-1.5rem;top:.4rem;width:10px;height:10px;border-radius:50%;background:var(--accent);transform:translateX(-4px);border:2px solid var(--bg)}
+.tl-item:last-child{padding-bottom:0}
+.tl-company{font-weight:700;font-size:.9rem}
+.tl-period{color:var(--muted);font-size:.78rem}
+.tl-role{color:var(--accent);font-size:.82rem;margin-top:.15rem}
+.tl-desc{color:var(--muted);font-size:.78rem;margin-top:.35rem;line-height:1.55}
+
+.email-hint{text-align:center;margin-top:1rem;font-size:.82rem;color:var(--muted)}
+.email-hint a{color:var(--accent2)}
+
+.footer{text-align:center;padding:2rem 0;font-size:.75rem;color:var(--muted);border-top:1px solid var(--border);margin-top:2rem}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="hero">
+  <div class="badge">🤖 AI Agent 工程师 · 12 年经验 · 深圳现场</div>
+  <h1>谭程俊 <span class="x">×</span> AI 助理</h1>
+  <div class="sub">多 Agent 协作架构 · RAG 管线 · 量化投研 · 数据中台 × AI 底座</div>
+  <div class="stats">
+    <div class="stat"><div class="num">12</div><div class="label">年经验</div></div>
+    <div class="stat"><div class="num">3</div><div class="label">层 Agent 协作</div></div>
+    <div class="stat"><div class="num">236</div><div class="label">生产 SQL 模型</div></div>
+    <div class="stat"><div class="num">30+</div><div class="label">Agent 技能</div></div>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="#try">🎯 体验 AI 助理</a>
+  <a href="#projects">📂 项目作品</a>
+  <a href="#skills">⚡ 核心技能</a>
+  <a href="#resume">📄 工作经历</a>
+</div>
+
+<!-- 体验AI助理 -->
+<div class="section" id="try">
+  <div class="section-title">🎯 体验 AI 助理</div>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">点击场景卡片自动填入问题，或直接输入你想让 AI 助理做的事。</p>
+  <div class="scenario-grid">
+    <div class="scenario-card" onclick="fillQ('帮我调研A股电力板块最近的行业政策变化和资金流向')">
+      <div class="icon">🔍</div>
+      <h3>信息调研</h3>
+      <p>多源搜索 + 结构化报告，信息带来源</p>
+    </div>
+    <div class="scenario-card" onclick="fillQ('帮我分析这个Excel的数据趋势并生成可视化图表')">
+      <div class="icon">📊</div>
+      <h3>数据分析</h3>
+      <p>Excel/PDF/CSV 全格式，自动清洗+可视化</p>
+    </div>
+    <div class="scenario-card" onclick="fillQ('帮我写一份AI Agent架构设计文档，包含状态机和交叉验证方案')">
+      <div class="icon">📝</div>
+      <h3>文档写作</h3>
+      <p>Word/PPT/PDF 全格式输出，从大纲到成品</p>
+    </div>
+    <div class="scenario-card" onclick="fillQ('设计一个多Agent协作系统的通信桥协议，要求支持状态机和错误记忆')">
+      <div class="icon">🧠</div>
+      <h3>架构设计</h3>
+      <p>Agent 协作 / 通信桥 / 状态机 / 交叉验证</p>
+    </div>
+  </div>
+  <div class="chat-box">
+    <div class="chat-header"><div class="chat-dot"></div><span style="font-size:.85rem">AI 助理在线</span></div>
+    <div class="chat-body">
+      <div class="chat-msg"><span class="bot-name">AI 助理：</span>你好！我是谭程俊的 AI 助理。你可以直接提问，或者点击上面的场景卡片试试。我会通过邮件自动处理并回复你。</div>
+    </div>
+    <div class="chat-input-wrap">
+      <input class="chat-input" id="qInput" type="text" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')sendQ()">
+      <button class="chat-send" onclick="sendQ()">发送</button>
+    </div>
+  </div>
+  <div class="email-hint">💡 也可以直接发邮件到 <a href="mailto:duovi@coze.email">duovi@coze.email</a>，AI 助理会自动处理回复</div>
+</div>
+
+<!-- 在线项目 -->
+<div class="section" id="projects">
+  <div class="section-title">📂 在线项目</div>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">非 demo，均为生产运行系统。点击链接可直接体验。</p>
+  <div class="proj-grid">
+    <div class="proj-card" onclick="location.href=this.dataset.url" style="cursor:pointer" data-url="http://www.aialter.site/zhuli/">
+      <span class="proj-badge badge-live">● 在线运行</span>
+      <h3>Alpha_Terminal 理财顾问终端 ↗</h3>
+      <p>三路行情聚合 + K线 + 资讯 + 知识库问答 + VIP 密钥体系。Node.js 后端 + Tailwind H5 + 腾讯云部署。</p>
+      <div class="proj-tags"><span>DeepSeek</span><span>Node.js</span><span>IMA</span><span>腾讯云</span><span>Tailwind</span></div>
+    </div>
+    <div class="proj-card" onclick="location.href=this.dataset.url" style="cursor:pointer" data-url="http://www.aialter.site/xuequ/">
+      <span class="proj-badge badge-live">● 在线运行</span>
+      <h3>深圳学位房规划助手 ↗</h3>
+      <p>10区积分计算 + 学区地图 + 学位锁定查询 + 回测引擎。Coze Bot + FastAPI + H5。</p>
+      <div class="proj-tags"><span>Coze Bot</span><span>FastAPI</span><span>H5</span><span>学区数据</span></div>
+    </div>
+    <div class="proj-card" onclick="location.href=this.dataset.url" style="cursor:pointer" data-url="http://www.aialter.site/xuequ/backtest.html">
+      <span class="proj-badge badge-gh">GitHub 开源</span>
+      <h3>HunterClaw 三层 Agent 协作系统 ↗</h3>
+      <p>猎手决策+龙虾执行+爱马仕数据，Redis+SQLite 9表持久化，状态机+交叉验证+错误记忆。</p>
+      <div class="proj-tags"><span>DeepSeek-V3</span><span>GLM-5.1</span><span>Redis</span><span>SQLite</span><span>ChromaDB</span></div>
+    </div>
+    <div class="proj-card" onclick="location.href=this.dataset.url" style="cursor:pointer" data-url="https://github.com/eninem123">
+      <span class="proj-badge badge-star">GitHub · ⭐ 12</span>
+      <h3>Finance-Risk-RAG v2.0</h3>
+      <p>批量PDF→OCR→分类→实体融合(规则+BERT)→向量检索问答，模拟贷前审查/贷后监控/风险预警。</p>
+      <div class="proj-tags"><span>FAISS</span><span>BERT</span><span>PyTorch</span><span>LangChain</span></div>
+    </div>
+    <div class="proj-card" onclick="location.href=this.dataset.url" style="cursor:pointer" data-url="https://github.com/eninem123/my-achievements">
+      <span class="proj-badge badge-gh">GitHub · 🏆 成就</span>
+      <h3>职业成就 & 核心项目 ↗</h3>
+      <p>团队荣誉证书 + 国家专利(对象运行监测方法) + 核心项目实战经验(银行风控AI / 数据中台 / Roop-Cam)。</p>
+      <div class="proj-tags"><span>荣誉</span><span>专利</span><span>证书</span><span>风控</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 核心技能 -->
+<div class="section" id="skills">
+  <div class="section-title">⚡ 核心技能</div>
+  <div class="skill-grid">
+    <div class="skill-card">
+      <h3>🤖 多 Agent 协作架构</h3>
+      <p>通信桥(Redis+SQLite) · 状态机 · 交叉验证 · 错误记忆 · Plan-Execute</p>
+    </div>
+    <div class="skill-card">
+      <h3>📚 RAG 管线</h3>
+      <p>ChromaDB · FAISS · 三路意图路由 · Sentence-Transformers · Token 消耗降 90%</p>
+    </div>
+    <div class="skill-card">
+      <h3>🧠 大模型应用</h3>
+      <p>DeepSeek-V3 · GLM-5.1 · Qwen-Max · 多模型路由+fallback · Prompt Engineering</p>
+    </div>
+    <div class="skill-card">
+      <h3>📈 量化投研</h3>
+      <p>铁律状态机 · 回测引擎 · 市场温度6级 · 板块轮动13ETF · cron调度</p>
+    </div>
+    <div class="skill-card">
+      <h3>🗄️ 数据中台×AI</h3>
+      <p>236 SQL模型 · 14源系统 · 225+ ETL · StarRocks · Flink CDC · MCP Server</p>
+    </div>
+    <div class="skill-card">
+      <h3>🛠️ 全栈开发</h3>
+      <p>FastAPI · Streamlit · Node.js · Tailwind H5 · BERT微调 · Nginx · 腾讯云</p>
+    </div>
+  </div>
+</div>
+
+<!-- 工作经历 -->
+<div class="section" id="resume">
+  <div class="section-title">📄 工作经历</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-company">洲明科技有限公司</div>
+      <div class="tl-period">2025.11 – 2026.07</div>
+      <div class="tl-role">高级 AI 数据工程师</div>
+      <div class="tl-desc">企业级 RAG 知识库（FAISS + 三路意图路由，Token 消耗降 90%，响应快 100 倍）· 五阶段 Agent 报表 Pipeline（5 Agent 串行协作）· Coze 智能体数智开发助手 · 236 生产 SQL + 225+ ETL 脚本维护</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-company">东亚银行（香港）迪辉金融科技</div>
+      <div class="tl-period">2024.04 – 2025.08</div>
+      <div class="tl-role">AI 风控负责人（带 4 人小组）</div>
+      <div class="tl-desc">财务文档智能解析：OCR → 分类 → 风险实体识别 → 检索问答 · BERT 微调 + 规则引擎 · IFRS9 报送与预警 · 香港粤语+英文办公</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-company">金蝶国际软件集团</div>
+      <div class="tl-period">2019.04 – 2024.03</div>
+      <div class="tl-role">云 AI 数据中台开发</div>
+      <div class="tl-desc">多租户并发数据管道（Flink CDC + DataX，TB 级同步）· AI 能力中台，为大模型应用提供标准化数据接口</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-company">早期经验</div>
+      <div class="tl-period">2014 – 2019</div>
+      <div class="tl-role">数据平台开发</div>
+      <div class="tl-desc">车载推荐（Spark Streaming + Kafka + HBase）· 电商数仓与用户画像</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  © 2026 谭程俊 × AI 助理 · 基于 HunterClaw 三层架构构建
+</div>
+
+</div>
+
+<script>
+function fillQ(text){document.getElementById('qInput').value=text;document.getElementById('qInput').focus()}
+function sendQ(){
+  var q=document.getElementById('qInput').value.trim();
+  if(!q)return;
+  var subject=encodeURIComponent('AI助理咨询：'+q.substring(0,50));
+  var body=encodeURIComponent(q);
+  window.location.href='mailto:duovi@coze.email?subject='+subject+'&body='+body;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "strategy": "atr_stop",
+  "start_date": "2025-05-28",
+  "end_date": "2026-05-28",
+  "initial_capital": 100000,
+  "final_capital": 101397.0,
+  "total_return": 1.4,
+  "annual_return": 1.4,
+  "max_drawdown": 0.7,
+  "sharpe_ratio": 0,
+  "total_trades": 10,
+  "win_rate": 60.0,
+  "avg_hold_days": 18.4,
+  "profit_factor": 2.6
+}

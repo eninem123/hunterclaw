@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>谭程俊 - AI Agent 工程师</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e14;--card:#111820;--border:rgba(148,163,184,.15);--accent:#00e87b;--accent2:#38bdf8;--text:#e2e8f0;--muted:#94a3b8;--gain:#00ff88;--loss:#ff6b6b}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;line-height:1.6}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+
+/* Header */
+.header{text-align:center;padding:3rem 0 2rem;border-bottom:1px solid var(--border)}
+.header h1{font-size:2rem;font-weight:800;letter-spacing:-.02em}
+.header .tagline{color:var(--muted);font-size:.95rem;margin-top:.5rem}
+.header .meta{display:flex;flex-wrap:wrap;justify-content:center;gap:.75rem;margin-top:1rem;font-size:.85rem;color:var(--muted)}
+.header .meta span::before{content:"·";margin-right:.75rem;color:var(--border)}
+.header .meta span:first-child::before{display:none}
+.header .links{display:flex;justify-content:center;gap:1rem;margin-top:1rem}
+.header .links a{background:rgba(0,232,123,.1);color:var(--accent);padding:.4rem 1rem;border-radius:8px;font-size:.85rem;border:1px solid rgba(0,232,123,.2);transition:all .2s}
+.header .links a:hover{background:rgba(0,232,123,.2);text-decoration:none}
+
+/* Section */
+.section{padding:2rem 0}
+.section-title{font-size:1.1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem}
+.section-title::before{content:"";display:inline-block;width:3px;height:1.1rem;background:var(--accent);border-radius:2px}
+
+/* Competency */
+.comp-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:640px){.comp-grid{grid-template-columns:1fr 1fr}}
+.comp-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;transition:border-color .2s}
+.comp-item:hover{border-color:rgba(0,232,123,.3)}
+.comp-item h3{font-size:.95rem;font-weight:700;margin-bottom:.5rem}
+.comp-item p{font-size:.82rem;color:var(--muted);line-height:1.55}
+.comp-item .highlight{color:var(--accent);font-weight:600}
+
+/* Tech tags */
+.tech-wrap{display:flex;flex-wrap:wrap;gap:.5rem}
+.tech-tag{background:rgba(56,189,248,.08);color:var(--accent2);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;border:1px solid rgba(56,189,248,.15)}
+
+/* Timeline */
+.timeline{position:relative;padding-left:1.5rem}
+.timeline::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-item{position:relative;padding-bottom:2rem}
+.tl-item::before{content:"";position:absolute;left:-1.5rem;top:.4rem;width:10px;height:10px;border-radius:50%;background:var(--accent);transform:translateX(-4px);border:2px solid var(--bg)}
+.tl-item:last-child{padding-bottom:0}
+.tl-header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem}
+.tl-company{font-weight:700;font-size:.95rem}
+.tl-period{color:var(--muted);font-size:.8rem}
+.tl-role{color:var(--accent);font-size:.85rem;margin-top:.25rem}
+.tl-desc{color:var(--muted);font-size:.82rem;margin-top:.5rem;line-height:1.6}
+
+/* Projects */
+.proj-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:640px){.proj-grid{grid-template-columns:1fr 1fr}}
+.proj-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;transition:border-color .2s}
+.proj-card:hover{border-color:rgba(0,232,123,.3)}
+.proj-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;font-weight:600}
+.badge-live{background:rgba(0,255,136,.12);color:var(--gain)}
+.badge-gh{background:rgba(56,189,248,.1);color:var(--accent2)}
+.badge-star{background:rgba(251,191,36,.1);color:#fbbf24}
+.proj-card h3{font-size:.9rem;font-weight:700;margin:.5rem 0 .35rem}
+.proj-card p{font-size:.8rem;color:var(--muted);line-height:1.5}
+.proj-card .proj-link{display:inline-block;margin-top:.5rem;font-size:.8rem}
+
+/* Education */
+.edu{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem}
+
+/* Footer */
+.footer{text-align:center;padding:2rem 0;font-size:.75rem;color:var(--muted);border-top:1px solid var(--border);margin-top:2rem}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>谭程俊</h1>
+  <div class="tagline">AI Agent 工程师 · 12 年经验 · 深圳</div>
+  <div class="meta">
+    <span>📱 13534033374</span>
+    <span>📧 2442972114@qq.com</span>
+    <span>💰 期望 30-35K</span>
+  </div>
+  <div class="links">
+    <a href="https://github.com/eninem123" target="_blank">GitHub</a>
+    <a href="https://www.aialter.site/zhuli/" target="_blank">Alpha_Terminal</a>
+    <a href="https://www.aialter.site/xuequ/" target="_blank">学位房助手</a>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">核心竞争力</div>
+  <div class="comp-grid">
+    <div class="comp-item">
+      <h3>🤖 多 Agent 协作架构</h3>
+      <p><span class="highlight">HunterClaw</span> 三层系统（猎手决策+龙虾执行+爱马仕数据），Redis+SQLite 9表持久化，状态机4步流转，交叉验证，错误记忆自动召回，<span class="highlight">连续运行2个月</span></p>
+    </div>
+    <div class="comp-item">
+      <h3>📚 RAG 管线</h3>
+      <p>ChromaDB+FAISS+Sentence-Transformers，三路意图路由，Token消耗降<span class="highlight">90%</span>，响应快<span class="highlight">100倍</span></p>
+    </div>
+    <div class="comp-item">
+      <h3>📈 量化投研闭环</h3>
+      <p>铁律状态机30+规则，5策略×4行情回测，市场温度6级量化，板块轮动13ETF</p>
+    </div>
+    <div class="comp-item">
+      <h3>🗄️ 数据中台×AI</h3>
+      <p><span class="highlight">236</span>生产SQL模型、14源系统、225+ETL脚本，改SQL前强制核对守卫流程</p>
+    </div>
+    <div class="comp-item">
+      <h3>🛠️ AI产品落地</h3>
+      <p>Alpha_Terminal理财顾问H5终端在线运行，三路行情+知识库问答+VIP密钥体系</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">技术栈</div>
+  <div class="tech-wrap">
+    <span class="tech-tag">Multi-Agent协作</span><span class="tech-tag">Redis+SQLite通信桥</span><span class="tech-tag">状态机</span><span class="tech-tag">ReAct</span><span class="tech-tag">Plan-Execute</span>
+    <span class="tech-tag">DeepSeek-V3</span><span class="tech-tag">GLM-5.1</span><span class="tech-tag">Qwen-Max</span><span class="tech-tag">多模型路由</span><span class="tech-tag">意图路由</span>
+    <span class="tech-tag">ChromaDB</span><span class="tech-tag">FAISS</span><span class="tech-tag">LangChain</span><span class="tech-tag">Sentence-Transformers</span>
+    <span class="tech-tag">FastAPI</span><span class="tech-tag">Streamlit</span><span class="tech-tag">Node.js</span><span class="tech-tag">Tailwind</span><span class="tech-tag">BERT微调</span>
+    <span class="tech-tag">StarRocks</span><span class="tech-tag">Flink CDC</span><span class="tech-tag">DataX</span><span class="tech-tag">MCP Server</span><span class="tech-tag">Nginx</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">工作经历</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-header"><span class="tl-company">洲明科技有限公司</span><span class="tl-period">2025.11 – 2026.07</span></div>
+      <div class="tl-role">高级 AI 数据工程师</div>
+      <div class="tl-desc">企业级RAG知识库（FAISS+三路意图路由，Token消耗降90%）· 五阶段Agent报表Pipeline（5 Agent串行协作）· Coze智能体数智开发助手 · 236生产SQL+225+ETL脚本</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-header"><span class="tl-company">东亚银行（香港）迪辉金融科技</span><span class="tl-period">2024.04 – 2025.08</span></div>
+      <div class="tl-role">AI 风控负责人（带4人小组）</div>
+      <div class="tl-desc">财务文档智能解析：OCR→分类→风险实体识别→检索问答 · BERT微调+规则引擎 · IFRS9报送与预警 · 香港粤语+英文办公</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-header"><span class="tl-company">金蝶国际软件集团</span><span class="tl-period">2019.04 – 2024.03</span></div>
+      <div class="tl-role">云 AI 数据中台开发</div>
+      <div class="tl-desc">多租户并发数据管道（Flink CDC+DataX，TB级同步）· AI能力中台标准化数据接口</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-header"><span class="tl-company">早期经验</span><span class="tl-period">2014 – 2019</span></div>
+      <div class="tl-role">数据平台开发</div>
+      <div class="tl-desc">车载推荐（Spark Streaming+Kafka+HBase）· 电商数仓与用户画像</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">开源与独立产品</div>
+  <div class="proj-grid">
+    <div class="proj-card">
+      <span class="proj-badge badge-live">● 运行中</span>
+      <h3>HunterClaw</h3>
+      <p>三层Agent量化协作系统，Redis+SQLite 9表，状态机+交叉验证+错误记忆，连续运行2个月</p>
+      <a class="proj-link" href="https://github.com/eninem123/hunterclaw" target="_blank">GitHub →</a>
+    </div>
+    <div class="proj-card">
+      <span class="proj-badge badge-live">● 在线</span>
+      <h3>Alpha_Terminal</h3>
+      <p>理财顾问H5终端，三路行情+K线+IMA知识库+VIP密钥，腾讯云Nginx部署</p>
+      <a class="proj-link" href="https://www.aialter.site/zhuli/" target="_blank">在线体验 →</a>
+    </div>
+    <div class="proj-card">
+      <span class="proj-badge badge-live">● 在线</span>
+      <h3>深圳学位房规划助手</h3>
+      <p>10区积分计算+学区地图+学位锁定+回测引擎，Coze Bot+FastAPI+H5</p>
+      <a class="proj-link" href="https://www.aialter.site/xuequ/" target="_blank">在线体验 →</a>
+    </div>
+    <div class="proj-card">
+      <span class="proj-badge badge-star">⭐ 12</span>
+      <h3>Finance-Risk-RAG v2.0</h3>
+      <p>批量PDF→OCR→分类→实体融合(规则+BERT)→向量检索问答，模拟贷前审查/贷后监控</p>
+      <a class="proj-link" href="https://github.com/eninem123/finance-risk-rag-v2" target="_blank">GitHub →</a>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">教育背景</div>
+  <div class="edu">
+    <strong>五邑大学</strong> · 本科 · 机械工程及自动化 · 2009–2013<br>
+    <span style="color:var(--muted);font-size:.82rem">国家红头文件表扬 · 财务供应链顾问资格证 · 国家专利</span>
+  </div>
+</div>
+
+<div class="footer">
+  © 2026 谭程俊 · AI Agent 工程师 · 基于 HunterClaw 三层架构构建
+</div>
+
+</div>
+</body>
+</html>

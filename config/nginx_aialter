@@ -1,0 +1,85 @@
+server {
+  listen 80;
+  server_name www.aialter.site;
+
+  root /var/www/html;
+  index index.html;
+
+  location / {
+    return 301 /zhuli/;
+  }
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # 理财顾问分析助手
+  location = /zhuli {
+    return 301 /zhuli/;
+  }
+  location /zhuli/ {
+    alias /var/www/zhuli/;
+    index index.html;
+    try_files $uri $uri/ /zhuli/index.html;
+  }
+
+  # VP站点 - 文书验真（已关闭）
+  # Hermes Agent Dashboard — 子路径 /hermes/
+  location /hermes/ {
+    proxy_pass http://127.0.0.1:9119/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix /hermes;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+  location = /hermes {
+    return 301 /hermes/;
+  }
+  # location = /vp {
+  #   return 301 /vp/;
+  # }
+  #
+  # location /vp/ {
+  #   alias /var/www/sipub.ssz.g0v.cnvp/;
+  #   index index.html;
+  #   charset utf-8;
+  # }
+
+  # 学位房规划助手
+  location = /xuequ {
+    return 301 /xuequ/;
+  }
+  location /xuequ/ {
+    alias /var/www/xuequ/;
+    index index.html;
+    try_files $uri $uri/ /xuequ/index.html;
+  }
+  location /xuequ/api/ {
+    proxy_pass http://127.0.0.1:8890/xuequ/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+    proxy_read_timeout 180s;
+    proxy_send_timeout 180s;
+  }
+
+  # 简历+AI助理展示页
+  location = /resume {
+    return 301 /resume/;
+  }
+  location ^~ /resume/ {
+    alias /var/www/aialter.site/resume/;
+    index index.html;
+  }
+}
